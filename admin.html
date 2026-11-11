@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <title>Admin — Colônia de Férias</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+</head>
+<body>
+  <header class="topo" style="padding-bottom:28px">
+    <h1>📋 Painel da Colônia</h1>
+    <p>Inscrições e pagamentos</p>
+  </header>
+
+  <!-- ===== Login ===== -->
+  <main id="tela-login" class="oculto" style="margin-top:24px;max-width:420px">
+    <div class="cartao">
+      <h2>Entrar</h2>
+      <form id="form-login">
+        <label>E-mail</label><input name="email" type="email" required autocomplete="username" />
+        <label style="margin-top:12px">Senha</label><input name="senha" type="password" required autocomplete="current-password" />
+        <div id="erro-login" class="aviso erro oculto"></div>
+        <div class="acoes"><button type="submit" style="width:100%">Entrar</button></div>
+      </form>
+    </div>
+  </main>
+
+  <!-- ===== Painel ===== -->
+  <main id="tela-painel" class="largo oculto">
+    <div style="display:flex;justify-content:flex-end;gap:10px;align-items:center;margin-bottom:12px">
+      <span class="suave" id="usuario"></span>
+      <button class="secundario pequeno" onclick="sair()">Sair</button>
+    </div>
+
+    <div class="resumo">
+      <div class="cartao"><div class="rotulo">Inscrições ativas</div><div class="valor" id="t-total">0</div></div>
+      <div class="cartao"><div class="rotulo">Pagas</div><div class="valor" id="t-pagas" style="color:var(--verde)">0</div></div>
+      <div class="cartao"><div class="rotulo">A confirmar</div><div class="valor" id="t-confirmar" style="color:var(--azul)">0</div></div>
+      <div class="cartao"><div class="rotulo">Recebido</div><div class="valor" id="t-recebido">R$ 0</div></div>
+      <div class="cartao"><div class="rotulo">A receber</div><div class="valor" id="t-receber" style="color:var(--vermelho)">R$ 0</div></div>
+    </div>
+
+    <div class="cartao">
+      <div class="filtros">
+        <input id="busca" placeholder="Buscar por aluno, responsável, telefone ou nº..." />
+        <select id="f-status">
+          <option value="">Todas as situações</option>
+          <option>Pendente</option><option>Aguardando confirmação</option><option>Parcial</option><option>Pago</option><option>Cancelada</option>
+        </select>
+        <select id="f-turma"><option value="">Todas as turmas</option></select>
+        <button onclick="exportarCsv()">⬇ Exportar Excel (CSV)</button>
+      </div>
+      <div class="tabela-rolagem">
+        <table>
+          <thead><tr><th>Nº</th><th>Aluno</th><th>Responsável</th><th>Turma</th><th>Valor</th><th>Pago</th><th>Situação</th></tr></thead>
+          <tbody id="lista"></tbody>
+        </table>
+      </div>
+      <p id="vazio" class="suave oculto">Nenhuma inscrição encontrada.</p>
+    </div>
+  </main>
+
+  <dialog id="detalhe">
+    <div class="conteudo">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+        <h2 style="margin:0">Inscrição nº <span id="d-id"></span></h2>
+        <button class="secundario pequeno" onclick="detalhe.close()">Fechar ✕</button>
+      </div>
+      <div id="d-info" class="info" style="margin-top:16px"></div>
+
+      <h3>Pagamentos</h3>
+      <div id="d-pagamentos"></div>
+
+      <div id="d-novo">
+        <h3>Registrar pagamento recebido</h3>
+        <form id="form-pag" class="grade">
+          <div><label>Valor (R$)</label><input name="valor" type="number" step="0.01" min="0.01" required /></div>
+          <div><label>Forma</label><select name="forma" id="formas"></select></div>
+          <div><label>Data</label><input name="data_pagamento" type="date" required /></div>
+          <div><label>Observação</label><input name="observacao" /></div>
+          <div style="align-self:end"><button class="verde" type="submit" style="width:100%">Registrar</button></div>
+        </form>
+      </div>
+      <div id="d-erro" class="aviso erro oculto"></div>
+
+      <div class="acoes"><button id="btn-cancelar" class="perigo"></button></div>
+    </div>
+  </dialog>
+
+<script>
+  const $ = (s) => document.querySelector(s);
+  const brl = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const dataBR = (d) => (d ? d.slice(0, 10).split('-').reverse().join('/') : '');
+  const dataHoraBR = (d) => (d ? new Date(d).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '');
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const fone = (t) => (t || '').replace(/^(\d{2})(\d{4,5})(\d{4})$/, '($1) $2-$3');
+  const selo = (s) => `<span class="selo ${s.split(' ')[0]}">${esc(s)}</span>`;
+  const hoje = () => new Date().toLocaleDateString('sv-SE');
+  let inscricoes = [];
+  let atual = null;
+  let timer = null;
+
+  // Executa uma consulta do Supabase e lança o erro, se houver.
+  async function q(promessa) {
+    const { data, error } = await promessa;
+    if (error) throw new Error(error.message);
+    return data;
+  }
+
+  function mostrarErro(el, msg) { el.textContent = msg; el.classList.toggle('oculto', !msg); }
+
+  // ---------- Login ----------
+  async function iniciar() {
+    $('#formas').innerHTML = CONFIG.pagamento.formas.map((f) => `<option>${esc(f)}</option>`).join('');
+    if (!sb) {
+      $('#tela-login').classList.remove('oculto');
+      mostrarErro($('#erro-login'), 'Site ainda não conectado ao Supabase: preencha o arquivo config.js.');
+      return;
+    }
+    const { data } = await sb.auth.getSession();
+    if (data.session) entrou(data.session); else $('#tela-login').classList.remove('oculto');
+  }
+
+  $('#form-login').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const f = e.target, btn = f.querySelector('button');
+    btn.disabled = true;
+    mostrarErro($('#erro-login'), '');
+    try {
+      if (!sb) throw new Error('Preencha o arquivo config.js.');
+      const { data, error } = await sb.auth.signInWithPassword({ email: f.email.value, password: f.senha.value });
+      if (error) throw new Error('E-mail ou senha incorretos.');
+      await entrou(data.session);
+    } catch (err) {
+      mostrarErro($('#erro-login'), err.message);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  async function entrou(sessao) {
+    if (!(await rpc('eh_admin'))) {
+      await sb.auth.signOut();
+      $('#tela-login').classList.remove('oculto');
+      mostrarErro($('#erro-login'), 'Este usuário não tem permissão de administrador.');
+      return;
+    }
+    $('#usuario').textContent = sessao.user.email;
+    $('#tela-login').classList.add('oculto');
+    $('#tela-painel').classList.remove('oculto');
+    await carregar();
+    timer = setInterval(() => { if (!detalhe.open) carregar(); }, 30000);
+  }
+
+  async function sair() {
+    clearInterval(timer);
+    await sb.auth.signOut();
+    location.reload();
+  }
+
+  // ---------- Dados ----------
+  async function carregar() {
+    const [lista, pagamentos] = await Promise.all([
+      q(sb.from('inscricoes_detalhe').select('*').order('id', { ascending: false })),
+      q(sb.from('pagamentos').select('*').order('id')),
+    ]);
+    for (const i of lista) i.pagamentos = pagamentos.filter((p) => p.inscricao_id === i.id);
+    inscricoes = lista;
+
+    const ativas = inscricoes.filter((i) => !i.cancelada);
+    $('#t-total').textContent = ativas.length;
+    $('#t-pagas').textContent = ativas.filter((i) => i.status === 'Pago').length;
+    $('#t-confirmar').textContent = ativas.filter((i) => i.status === 'Aguardando confirmação').length;
+    $('#t-recebido').textContent = brl(ativas.reduce((s, i) => s + Number(i.valor_pago), 0));
+    $('#t-receber').textContent = brl(ativas.reduce((s, i) => s + Number(i.saldo), 0));
+
+    const turmas = [...new Map(inscricoes.map((i) => [i.turma, i.turma_nome])).entries()];
+    const sel = $('#f-turma'), v = sel.value;
+    sel.innerHTML = '<option value="">Todas as turmas</option>' + turmas.map(([id, n]) => `<option value="${esc(id)}">${esc(n)}</option>`).join('');
+    sel.value = v;
+    desenhar();
+    if (atual && detalhe.open) abrir(atual);
+  }
+
+  function desenhar() {
+    const busca = $('#busca').value.toLowerCase().trim();
+    const st = $('#f-status').value, tu = $('#f-turma').value;
+    const lista = inscricoes.filter((i) =>
+      (!st || i.status === st) && (!tu || i.turma === tu) &&
+      (!busca || [i.id, i.aluno_nome, i.responsavel_nome, i.responsavel_telefone].join(' ').toLowerCase().includes(busca)));
+    $('#vazio').classList.toggle('oculto', lista.length > 0);
+    $('#lista').innerHTML = lista.map((i) => `
+      <tr class="linha" onclick="abrir(${i.id})">
+        <td><strong>${i.id}</strong></td>
+        <td>${esc(i.aluno_nome)}</td>
+        <td>${esc(i.responsavel_nome)}<br><span class="suave">${fone(i.responsavel_telefone)}</span></td>
+        <td>${esc(i.turma_nome)}</td>
+        <td>${brl(i.valor)}</td>
+        <td>${brl(i.valor_pago)}</td>
+        <td>${selo(i.status)}</td>
+      </tr>`).join('');
+  }
+
+  function abrir(id) {
+    const i = inscricoes.find((x) => x.id === id);
+    if (!i) return;
+    atual = id;
+    $('#d-id').textContent = i.id;
+    const campo = (rot, val) => `<div><span>${rot}</span>${esc(val) || '—'}</div>`;
+    $('#d-info').innerHTML = [
+      campo('Aluno', i.aluno_nome), campo('Nascimento', dataBR(i.aluno_nascimento)), campo('Escola', i.aluno_escola),
+      campo('Saúde / cuidados', i.aluno_saude), campo('Responsável', i.responsavel_nome), campo('CPF', i.responsavel_cpf),
+      campo('Telefone', fone(i.responsavel_telefone)), campo('E-mail', i.responsavel_email), campo('Emergência', i.contato_emergencia),
+      campo('Turma', i.turma_nome), campo('Uso de imagem', i.autoriza_imagem ? 'Autorizado' : 'Não autorizado'),
+      campo('Inscrito em', dataHoraBR(i.criado_em)),
+    ].join('') + `<div><span>Valor / Saldo</span><strong>${brl(i.valor)}</strong> / ${brl(i.saldo)}</div><div><span>Situação</span>${selo(i.status)}</div>`;
+
+    $('#d-pagamentos').innerHTML = i.pagamentos.length
+      ? '<div class="tabela-rolagem"><table><tr><th>Data</th><th>Valor</th><th>Forma</th><th>Obs.</th><th>Origem</th><th></th></tr>' +
+        i.pagamentos.map((p) => `<tr>
+          <td>${dataBR(p.data_pagamento)}</td><td>${brl(p.valor)}</td><td>${esc(p.forma)}</td><td>${esc(p.observacao)}</td>
+          <td>${p.informado_por === 'responsavel' ? 'Responsável' : 'Equipe'}</td>
+          <td style="white-space:nowrap">
+            ${p.confirmado ? '<span class="selo Pago">Confirmado</span>' : `<button class="verde pequeno" onclick="confirmar(${p.id})">✔ Confirmar</button>`}
+            <button class="perigo pequeno" onclick="excluir(${p.id})" title="Excluir">✕</button>
+          </td></tr>`).join('') + '</table></div>'
+      : '<p class="suave">Nenhum pagamento registrado.</p>';
+
+    $('#d-novo').classList.toggle('oculto', i.cancelada);
+    const f = $('#form-pag');
+    f.reset();
+    f.valor.value = Number(i.saldo) ? Number(i.saldo).toFixed(2) : '';
+    f.data_pagamento.value = hoje();
+    mostrarErro($('#d-erro'), '');
+    const b = $('#btn-cancelar');
+    b.textContent = i.cancelada ? 'Reativar inscrição' : 'Cancelar inscrição';
+    b.onclick = () => acao(async () => {
+      if (!i.cancelada && !confirm('Cancelar esta inscrição? A vaga será liberada.')) return;
+      await q(sb.from('inscricoes').update({ cancelada: !i.cancelada }).eq('id', i.id));
+    });
+    if (!detalhe.open) detalhe.showModal();
+  }
+
+  // Executa uma alteração, mostra erro se houver e recarrega a lista.
+  async function acao(fn) {
+    try {
+      await fn();
+      await carregar();
+    } catch (err) {
+      mostrarErro($('#d-erro'), err.message);
+    }
+  }
+
+  const confirmar = (pid) => acao(() => q(sb.from('pagamentos').update({ confirmado: true }).eq('id', pid)));
+  const excluir = (pid) => acao(async () => {
+    if (!confirm('Excluir este pagamento?')) return;
+    await q(sb.from('pagamentos').delete().eq('id', pid));
+  });
+
+  $('#form-pag').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const f = e.target;
+    acao(() => q(sb.from('pagamentos').insert({
+      inscricao_id: atual,
+      valor: Number(f.valor.value),
+      forma: f.forma.value,
+      data_pagamento: f.data_pagamento.value,
+      observacao: f.observacao.value.trim() || null,
+      informado_por: 'admin',
+      confirmado: true,
+    })));
+  });
+
+  // ---------- Exportar ----------
+  function exportarCsv() {
+    const colunas = {
+      id: 'Nº', criado_em: 'Inscrito em', aluno_nome: 'Aluno', aluno_nascimento: 'Nascimento', aluno_escola: 'Escola',
+      aluno_saude: 'Saúde', responsavel_nome: 'Responsável', responsavel_cpf: 'CPF', responsavel_telefone: 'Telefone',
+      responsavel_email: 'E-mail', contato_emergencia: 'Emergência', turma_nome: 'Turma', valor: 'Valor',
+      valor_pago: 'Pago', saldo: 'Saldo', status: 'Situação', autoriza_imagem: 'Uso de imagem',
+    };
+    const formatar = (c, v) =>
+      c === 'criado_em' ? dataHoraBR(v) :
+      c === 'aluno_nascimento' ? dataBR(v) :
+      c === 'autoriza_imagem' ? (v ? 'Sim' : 'Não') :
+      ['valor', 'valor_pago', 'saldo'].includes(c) ? Number(v).toFixed(2).replace('.', ',') : v;
+    const cel = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const linhas = [Object.values(colunas).map(cel).join(';'),
+      ...[...inscricoes].reverse().map((i) => Object.keys(colunas).map((c) => cel(formatar(c, i[c]))).join(';'))];
+    const blob = new Blob(['﻿' + linhas.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: `inscricoes-${hoje()}.csv` });
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  ['#busca', '#f-status', '#f-turma'].forEach((s) => $(s).addEventListener('input', desenhar));
+  iniciar();
+</script>
+</body>
+</html>

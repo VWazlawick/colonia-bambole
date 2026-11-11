@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Inscrição — Colônia de Férias</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+</head>
+<body>
+  <header class="topo">
+    <h1 id="titulo">☀️ Colônia de Férias</h1>
+    <p><strong id="edicao"></strong></p>
+    <p id="periodo"></p>
+    <p id="vagas-geral" class="oculto" style="display:inline-block;margin-top:10px;background:rgba(255,255,255,.25);padding:4px 14px;border-radius:999px;font-weight:700"></p>
+  </header>
+
+  <main>
+    <div id="aviso-config" class="aviso erro oculto">
+      ⚠️ Site ainda não conectado ao banco. Preencha a URL e a chave do Supabase no arquivo <code>config.js</code>.
+    </div>
+
+    <div class="abas">
+      <button id="aba-inscrever" class="ativa" onclick="mostrarAba('inscrever')">📝 Nova inscrição</button>
+      <button id="aba-consultar" onclick="mostrarAba('consultar')">💳 Consultar / informar pagamento</button>
+    </div>
+
+    <!-- ===== Nova inscrição ===== -->
+    <section id="sec-inscrever" class="cartao">
+      <h2>Ficha de inscrição</h2>
+      <form id="form-inscricao">
+        <h3>Dados do aluno</h3>
+        <div class="grade">
+          <div><label>Nome completo *</label><input name="aluno_nome" required /></div>
+          <div><label>Data de nascimento *</label><input type="date" name="aluno_nascimento" required /></div>
+          <div><label>Escola / série <span class="opc">(opcional)</span></label><input name="aluno_escola" /></div>
+        </div>
+        <div style="margin-top:14px">
+          <label>Alergias, medicamentos ou cuidados especiais <span class="opc">(opcional)</span></label>
+          <textarea name="aluno_saude" placeholder="Ex.: alergia a amendoim, usa bombinha..."></textarea>
+        </div>
+
+        <h3>Dados do responsável</h3>
+        <div class="grade">
+          <div><label>Nome completo *</label><input name="responsavel_nome" required /></div>
+          <div><label>CPF <span class="opc">(opcional)</span></label><input name="responsavel_cpf" inputmode="numeric" placeholder="000.000.000-00" /></div>
+          <div><label>Telefone / WhatsApp *</label><input name="responsavel_telefone" inputmode="tel" required placeholder="(11) 99999-9999" /></div>
+          <div><label>E-mail <span class="opc">(opcional)</span></label><input type="email" name="responsavel_email" /></div>
+          <div><label>Contato de emergência <span class="opc">(nome e telefone)</span></label><input name="contato_emergencia" /></div>
+        </div>
+
+        <h3>Turma</h3>
+        <select name="turma" id="turma" required><option value="">Carregando turmas...</option></select>
+
+        <div style="margin-top:16px">
+          <label class="check"><input type="checkbox" name="autoriza_imagem" /> Autorizo o uso da imagem do aluno em fotos e vídeos da colônia.</label>
+        </div>
+
+        <div id="erro-inscricao" class="aviso erro oculto"></div>
+        <div class="acoes"><button type="submit">Confirmar inscrição</button></div>
+      </form>
+    </section>
+
+    <!-- ===== Inscrição confirmada ===== -->
+    <section id="sec-sucesso" class="cartao oculto">
+      <h2>🎉 Inscrição realizada!</h2>
+      <p>Número da inscrição:</p>
+      <div class="numero" id="suc-numero"></div>
+      <p class="suave">Guarde este número. Com ele e o telefone cadastrado você consulta a inscrição e informa o pagamento.</p>
+      <p><strong id="suc-aluno"></strong> — <span id="suc-turma"></span><br />Valor: <strong id="suc-valor"></strong></p>
+      <div class="pix">
+        <strong>Pagamento via PIX</strong><br />
+        Chave (<span class="tipo-chave"></span>): <code class="chave-pix"></code>
+        <button type="button" class="secundario pequeno" onclick="copiarPix(this)">📋 Copiar</button><br />
+        Favorecido: <span class="favorecido"></span>
+      </div>
+      <div class="acoes">
+        <button onclick="irParaPagamento()">Já paguei — informar pagamento</button>
+        <button class="secundario" onclick="novaInscricao()">Fazer outra inscrição</button>
+      </div>
+    </section>
+
+    <!-- ===== Consulta ===== -->
+    <section id="sec-consultar" class="cartao oculto">
+      <h2>Consultar inscrição</h2>
+      <form id="form-consulta" class="grade">
+        <div><label>Nº da inscrição</label><input name="id" inputmode="numeric" required /></div>
+        <div><label>Telefone cadastrado</label><input name="telefone" inputmode="tel" required /></div>
+        <div style="align-self:end"><button type="submit" style="width:100%">Consultar</button></div>
+      </form>
+      <div id="erro-consulta" class="aviso erro oculto"></div>
+
+      <div id="resultado" class="oculto">
+        <h3>Inscrição nº <span id="r-id"></span></h3>
+        <div class="info">
+          <div><span>Aluno</span><strong id="r-aluno"></strong></div>
+          <div><span>Turma</span><span id="r-turma" style="color:inherit;font-size:inherit"></span></div>
+          <div><span>Valor total</span><strong id="r-valor"></strong></div>
+          <div><span>Pago (confirmado)</span><strong id="r-pago"></strong></div>
+          <div><span>Saldo</span><strong id="r-saldo"></strong></div>
+          <div><span>Situação</span><span id="r-status"></span></div>
+        </div>
+        <div id="r-pagamentos"></div>
+
+        <div id="bloco-informar">
+          <div class="pix">
+            <strong>Pagamento via PIX</strong><br />
+            Chave (<span class="tipo-chave"></span>): <code class="chave-pix"></code>
+            <button type="button" class="secundario pequeno" onclick="copiarPix(this)">📋 Copiar</button><br />
+            Favorecido: <span class="favorecido"></span>
+          </div>
+          <h3>Informar pagamento</h3>
+          <form id="form-pagamento">
+            <div class="grade">
+              <div><label>Valor pago (R$)</label><input name="valor" type="number" step="0.01" min="0.01" required /></div>
+              <div><label>Forma de pagamento</label><select name="forma" id="formas" required></select></div>
+              <div><label>Data do pagamento</label><input name="data_pagamento" type="date" required /></div>
+            </div>
+            <div style="margin-top:14px">
+              <label>Observação <span class="opc">(ex.: nome de quem pagou, nº do comprovante)</span></label>
+              <input name="observacao" />
+            </div>
+            <div id="msg-pagamento" class="aviso oculto"></div>
+            <div class="acoes"><button type="submit">Enviar informação de pagamento</button></div>
+          </form>
+        </div>
+      </div>
+    </section>
+  </main>
+
+<script>
+  const C = window.CONFIG;
+  const brl = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const dataBR = (d) => (d ? d.split('-').reverse().join('/') : '');
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const $ = (s) => document.querySelector(s);
+  const hoje = () => new Date().toLocaleDateString('sv-SE');
+  let consultaAtual = null;
+
+  function aviso(el, msg, tipo = 'erro') {
+    el.textContent = msg;
+    el.className = `aviso ${tipo}` + (msg ? '' : ' oculto');
+  }
+
+  function mostrarAba(aba) {
+    $('#aba-inscrever').classList.toggle('ativa', aba === 'inscrever');
+    $('#aba-consultar').classList.toggle('ativa', aba === 'consultar');
+    $('#sec-inscrever').classList.toggle('oculto', aba !== 'inscrever');
+    $('#sec-sucesso').classList.add('oculto');
+    $('#sec-consultar').classList.toggle('oculto', aba !== 'consultar');
+  }
+
+  function aplicarConfig() {
+    document.title = `Inscrição — ${C.nomeColonia}`;
+    $('#titulo').textContent = `☀️ ${C.nomeColonia}`;
+    $('#edicao').textContent = C.edicao || '';
+    $('#periodo').textContent = C.periodo || '';
+    $('#formas').innerHTML = C.pagamento.formas.map((f) => `<option>${esc(f)}</option>`).join('');
+    document.querySelectorAll('.chave-pix').forEach((e) => (e.textContent = formatarChave(C.pagamento.chavePix)));
+    document.querySelectorAll('.tipo-chave').forEach((e) => (e.textContent = C.pagamento.tipoChave || 'PIX'));
+    document.querySelectorAll('.favorecido').forEach((e) => (e.textContent = C.pagamento.favorecido));
+    $('#aviso-config').classList.toggle('oculto', window.configurado);
+  }
+
+  // Mostra CNPJ/CPF com pontuação; outras chaves ficam como estão.
+  function formatarChave(c) {
+    if (/^\d{14}$/.test(c)) return c.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+    if (/^\d{11}$/.test(c)) return c.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4');
+    return c;
+  }
+
+  async function copiarPix(btn) {
+    try {
+      await navigator.clipboard.writeText(C.pagamento.chavePix);
+      btn.textContent = '✔ Copiado!';
+    } catch {
+      btn.textContent = 'Copie manualmente';
+    }
+    setTimeout(() => (btn.textContent = '📋 Copiar'), 2500);
+  }
+
+  // Desloca uma data ISO (AAAA-MM-DD) em anos/dias.
+  function deslocar(iso, anos, dias = 0) {
+    const d = new Date(iso + 'T12:00:00');
+    d.setFullYear(d.getFullYear() + anos);
+    d.setDate(d.getDate() + dias);
+    return d.toLocaleDateString('sv-SE');
+  }
+
+  async function carregarTurmas() {
+    try {
+      const turmas = await rpc('turmas_disponiveis');
+      $('#turma').innerHTML = '<option value="">Selecione...</option>' + turmas
+        .map((t) => `<option value="${esc(t.id)}" ${t.restantes ? '' : 'disabled'}>${esc(t.nome)} — ${brl(t.valor)}${t.restantes ? '' : ' (ESGOTADA)'}</option>`)
+        .join('');
+      if (!turmas.length) return;
+      const g = turmas[0];
+      $('#periodo').textContent = `${C.periodo} · Crianças de ${g.idade_min} a ${g.idade_max} anos`;
+      // nascimento permitido: idade entre mínimo e máximo na data de início
+      const nasc = $('#form-inscricao').aluno_nascimento;
+      nasc.max = deslocar(g.data_inicio, -g.idade_min);
+      nasc.min = deslocar(g.data_inicio, -(g.idade_max + 1), 1);
+      const v = $('#vagas-geral');
+      v.classList.remove('oculto');
+      v.textContent = g.restantes_geral ? `🎟️ Restam ${g.restantes_geral} vagas na pré-venda` : '🎟️ Vagas da pré-venda esgotadas';
+      $('#form-inscricao button[type=submit]').disabled = !g.restantes_geral;
+    } catch (err) {
+      $('#turma').innerHTML = '<option value="">Não foi possível carregar as turmas</option>';
+    }
+  }
+
+  $('#form-inscricao').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const f = e.target, btn = f.querySelector('button');
+    const dados = Object.fromEntries(new FormData(f));
+    dados.autoriza_imagem = f.autoriza_imagem.checked;
+    btn.disabled = true;
+    try {
+      const i = await rpc('criar_inscricao', { dados });
+      $('#suc-numero').textContent = i.id;
+      $('#suc-aluno').textContent = i.aluno_nome;
+      $('#suc-turma').textContent = i.turma_nome;
+      $('#suc-valor').textContent = brl(i.valor);
+      consultaAtual = { id: i.id, telefone: i.responsavel_telefone };
+      $('#sec-inscrever').classList.add('oculto');
+      $('#sec-sucesso').classList.remove('oculto');
+      aviso($('#erro-inscricao'), '');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      carregarTurmas();
+    } catch (err) {
+      aviso($('#erro-inscricao'), err.message);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  function novaInscricao() {
+    $('#form-inscricao').reset();
+    mostrarAba('inscrever');
+  }
+
+  function irParaPagamento() {
+    mostrarAba('consultar');
+    const f = $('#form-consulta');
+    f.id.value = consultaAtual.id;
+    f.telefone.value = consultaAtual.telefone;
+    consultar();
+  }
+
+  async function consultar() {
+    const f = $('#form-consulta');
+    try {
+      const i = await rpc('consultar_inscricao', { p_id: Number(f.id.value) || 0, p_telefone: f.telefone.value });
+      consultaAtual = { id: i.id, telefone: i.responsavel_telefone };
+      aviso($('#erro-consulta'), '');
+      $('#resultado').classList.remove('oculto');
+      $('#r-id').textContent = i.id;
+      $('#r-aluno').textContent = i.aluno_nome;
+      $('#r-turma').textContent = i.turma_nome;
+      $('#r-valor').textContent = brl(i.valor);
+      $('#r-pago').textContent = brl(i.valor_pago);
+      $('#r-saldo').textContent = brl(i.saldo);
+      $('#r-status').innerHTML = `<span class="selo ${i.status.split(' ')[0]}">${esc(i.status)}</span>`;
+      $('#r-pagamentos').innerHTML = i.pagamentos.length
+        ? '<h3>Pagamentos informados</h3><div class="tabela-rolagem"><table><tr><th>Data</th><th>Valor</th><th>Forma</th><th>Situação</th></tr>' +
+          i.pagamentos.map((p) => `<tr><td>${dataBR(p.data_pagamento)}</td><td>${brl(p.valor)}</td><td>${esc(p.forma)}</td><td>${p.confirmado ? '<span class="selo Pago">Confirmado</span>' : '<span class="selo Aguardando">Aguardando confirmação</span>'}</td></tr>`).join('') +
+          '</table></div>'
+        : '';
+      const podeInformar = i.status !== 'Pago' && i.status !== 'Cancelada';
+      $('#bloco-informar').classList.toggle('oculto', !podeInformar);
+      const fp = $('#form-pagamento');
+      fp.valor.value = i.saldo ? Number(i.saldo).toFixed(2) : '';
+      if (!fp.data_pagamento.value) fp.data_pagamento.value = hoje();
+    } catch (err) {
+      $('#resultado').classList.add('oculto');
+      aviso($('#erro-consulta'), err.message);
+    }
+  }
+
+  $('#form-consulta').addEventListener('submit', (e) => { e.preventDefault(); consultar(); });
+
+  $('#form-pagamento').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const f = e.target, btn = f.querySelector('button');
+    btn.disabled = true;
+    try {
+      await rpc('informar_pagamento', {
+        p_id: consultaAtual.id,
+        p_telefone: consultaAtual.telefone,
+        p_valor: Number(f.valor.value),
+        p_forma: f.forma.value,
+        p_data: f.data_pagamento.value,
+        p_observacao: f.observacao.value,
+      });
+      f.observacao.value = '';
+      await consultar();
+      aviso($('#msg-pagamento'), 'Pagamento informado! A equipe vai conferir e confirmar em breve.', 'ok');
+    } catch (err) {
+      aviso($('#msg-pagamento'), err.message);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  aplicarConfig();
+  carregarTurmas();
+</script>
+</body>
+</html>
