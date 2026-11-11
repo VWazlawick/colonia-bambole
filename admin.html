@@ -86,7 +86,10 @@
       </div>
       <div id="d-erro" class="aviso erro oculto"></div>
 
-      <div class="acoes"><button id="btn-cancelar" class="perigo"></button></div>
+      <div class="acoes">
+        <button id="btn-cancelar" class="perigo"></button>
+        <button id="btn-lgpd" class="perigo" title="Atende pedido de exclusão de dados (LGPD)">🗑 Apagar dados pessoais (LGPD)</button>
+      </div>
     </div>
   </dialog>
 
@@ -216,6 +219,8 @@
       campo('Telefone', fone(i.responsavel_telefone)), campo('E-mail', i.responsavel_email), campo('Emergência', i.contato_emergencia),
       campo('Turma', i.turma_nome), campo('Uso de imagem', i.autoriza_imagem ? 'Autorizado' : 'Não autorizado'),
       campo('Inscrito em', dataHoraBR(i.criado_em)),
+      campo('Consentimento LGPD', i.consentimento_em ? `${dataHoraBR(i.consentimento_em)} (aviso ${dataBR(i.versao_aviso)})` : ''),
+      ...(i.anonimizada_em ? [campo('Dados removidos em', dataHoraBR(i.anonimizada_em))] : []),
     ].join('') + `<div><span>Valor / Saldo</span><strong>${brl(i.valor)}</strong> / ${brl(i.saldo)}</div><div><span>Situação</span>${selo(i.status)}</div>`;
 
     $('#d-pagamentos').innerHTML = i.pagamentos.length
@@ -240,6 +245,12 @@
     b.onclick = () => acao(async () => {
       if (!i.cancelada && !confirm('Cancelar esta inscrição? A vaga será liberada.')) return;
       await q(sb.from('inscricoes').update({ cancelada: !i.cancelada }).eq('id', i.id));
+    });
+    const bl = $('#btn-lgpd');
+    bl.classList.toggle('oculto', !!i.anonimizada_em);
+    bl.onclick = () => acao(async () => {
+      if (!confirm(`Apagar os dados pessoais da inscrição nº ${i.id}?\n\nNome, nascimento, saúde, CPF, telefone, e-mail e contatos serão apagados definitivamente. Ficam só a turma, o valor e os pagamentos.\n\nUse quando o responsável pedir a exclusão (LGPD) ou após o prazo de guarda. Não dá para desfazer.`)) return;
+      await rpc('anonimizar_inscricao', { p_id: i.id });
     });
     if (!detalhe.open) detalhe.showModal();
   }
@@ -281,9 +292,11 @@
       aluno_saude: 'Saúde', responsavel_nome: 'Responsável', responsavel_cpf: 'CPF', responsavel_telefone: 'Telefone',
       responsavel_email: 'E-mail', contato_emergencia: 'Emergência', turma_nome: 'Turma', valor: 'Valor',
       valor_pago: 'Pago', saldo: 'Saldo', status: 'Situação', autoriza_imagem: 'Uso de imagem',
+      consentimento_em: 'Consentimento LGPD',
     };
+    if (!confirm('A planilha terá dados pessoais e de saúde de crianças (LGPD).\n\nGuarde-a só em local seguro, não envie por grupos e apague quando não precisar mais. Continuar?')) return;
     const formatar = (c, v) =>
-      c === 'criado_em' ? dataHoraBR(v) :
+      c === 'criado_em' || c === 'consentimento_em' ? dataHoraBR(v) :
       c === 'aluno_nascimento' ? dataBR(v) :
       c === 'autoriza_imagem' ? (v ? 'Sim' : 'Não') :
       ['valor', 'valor_pago', 'saldo'].includes(c) ? Number(v).toFixed(2).replace('.', ',') : v;

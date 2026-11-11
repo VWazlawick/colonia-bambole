@@ -54,7 +54,15 @@
         <select name="turma" id="turma" required><option value="">Carregando turmas...</option></select>
 
         <div style="margin-top:16px">
-          <label class="check"><input type="checkbox" name="autoriza_imagem" /> Autorizo o uso da imagem do aluno em fotos e vídeos da colônia.</label>
+          <label class="check"><input type="checkbox" name="autoriza_imagem" /> <span>Autorizo o uso da imagem do aluno em fotos e vídeos da colônia. <span class="opc">(opcional — pode ser retirada a qualquer momento)</span></span></label>
+        </div>
+
+        <div class="consentimento">
+          <label class="check">
+            <input type="checkbox" name="consentimento" required />
+            <span>Declaro que sou <strong>pai, mãe ou responsável legal</strong> pela criança e <strong>consinto</strong> com o uso dos dados informados, inclusive os de saúde, para a inscrição e os cuidados durante a colônia, conforme o
+              <a href="aviso-privacidade.html" target="_blank">Aviso de Privacidade</a>. *</span>
+          </label>
         </div>
 
         <div id="erro-inscricao" class="aviso erro oculto"></div>
@@ -127,6 +135,8 @@
         </div>
       </div>
     </section>
+
+    <p class="rodape">🔒 Seus dados são protegidos conforme a LGPD · <a href="aviso-privacidade.html">Aviso de Privacidade</a></p>
   </main>
 
 <script>
@@ -215,6 +225,8 @@
     const f = e.target, btn = f.querySelector('button');
     const dados = Object.fromEntries(new FormData(f));
     dados.autoriza_imagem = f.autoriza_imagem.checked;
+    dados.consentimento = f.consentimento.checked;
+    dados.versao_aviso = C.privacidade.versaoAviso;
     btn.disabled = true;
     try {
       const i = await rpc('criar_inscricao', { dados });

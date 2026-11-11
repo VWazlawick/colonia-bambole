@@ -138,3 +138,12 @@ dialog .conteudo { padding: 24px; }
   header.topo h1 { font-size: 1.6rem; }
   .cartao { padding: 18px; }
 }
+.consentimento {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1.5px solid #ffd2b8;
+  background: #fff6f0;
+  border-radius: 10px;
+}
+.consentimento a, .rodape a { color: var(--primaria-escura); font-weight: 600; }
+.rodape { text-align: center; color: var(--suave); font-size: .88rem; margin: 8px 0 0; }
