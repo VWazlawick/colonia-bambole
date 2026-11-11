@@ -138,3 +138,31 @@ dialog .conteudo { padding: 24px; }
   header.topo h1 { font-size: 1.6rem; }
   .cartao { padding: 18px; }
 }
+.consentimento {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1.5px solid #ffd2b8;
+  background: #fff6f0;
+  border-radius: 10px;
+}
+.consentimento a, .rodape a { color: var(--primaria-escura); font-weight: 600; }
+.rodape { text-align: center; color: var(--suave); font-size: .88rem; margin: 8px 0 0; }
+.opcoes-pagamento { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.opcao {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-weight: 400;
+  border: 2px solid var(--borda);
+  border-radius: 12px;
+  padding: 14px;
+  cursor: pointer;
+  margin: 0;
+}
+.opcao input { width: auto; margin-top: 4px; accent-color: var(--primaria); }
+.opcao:has(input:checked) { border-color: var(--primaria); background: #fff3ea; }
+input[type=file] { padding: 8px; background: #fffaf4; }
+.aviso.alerta { background: #fff4d6; color: #6b4e00; }
+.botao.whatsapp { background: #25a35a; }
+.botao.whatsapp:hover { background: #1d8a4b; }
+.selo.Contato { background: #fff1cc; color: #7a5600; }
