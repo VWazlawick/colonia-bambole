@@ -22,6 +22,10 @@ Pais / Equipe ──▶ GitHub Pages (páginas)  ──▶  Supabase (PostgreSQL
 2. `git push` e abra um Pull Request no GitHub.
 3. Ao fazer o merge na `main`, o GitHub Pages publica em 1–2 minutos.
 
+**Mudou `style.css` ou `config.js`?** Aumente a versão nos links (`style.css?v=2` → `?v=3`, idem `config.js`)
+em `index.html`, `admin.html` e `aviso-privacidade.html`. Sem isso, o navegador de quem já visitou o site
+pode continuar usando o arquivo antigo (o GitHub Pages guarda cache por até 10 minutos).
+
 ## Pagamento
 - **PIX:** o responsável paga e anexa o comprovante (foto ou PDF, até 5 MB) na própria inscrição — sem comprovante, a inscrição não é aceita. A situação fica *Aguardando confirmação* até a equipe abrir o comprovante no painel (📎) e clicar em **Confirmar**.
 - **Cartão:** a inscrição fica *Contato pendente* e o responsável é orientado a chamar a equipe no WhatsApp. Depois de receber, a equipe registra o pagamento no painel.

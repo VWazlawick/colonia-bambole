@@ -60,8 +60,15 @@ input, select, textarea {
 }
 input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primaria); box-shadow: 0 0 0 3px #ffe0cf; }
 textarea { min-height: 70px; resize: vertical; }
-.check { display: flex; gap: 8px; align-items: flex-start; font-weight: 400; }
-.check input { width: auto; margin-top: 4px; }
+.check { display: flex; gap: 10px; align-items: flex-start; font-weight: 400; line-height: 1.5; }
+.check input, .opcao input {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin: 3px 0 0;
+  padding: 0;
+  accent-color: var(--primaria);
+}
 button, .botao {
   background: var(--primaria);
   color: #fff;
@@ -159,7 +166,6 @@ dialog .conteudo { padding: 24px; }
   cursor: pointer;
   margin: 0;
 }
-.opcao input { width: auto; margin-top: 4px; accent-color: var(--primaria); }
 .opcao:has(input:checked) { border-color: var(--primaria); background: #fff3ea; }
 input[type=file] { padding: 8px; background: #fffaf4; }
 .aviso.alerta { background: #fff4d6; color: #6b4e00; }
