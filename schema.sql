@@ -226,7 +226,7 @@ as $$
 $$;
 
 -- Cria uma inscrição. Valor, vagas, idade, aceite e comprovante são conferidos aqui, no banco.
--- PIX: o comprovante é obrigatório e já vira um pagamento "aguardando confirmação".
+-- PIX: o comprovante é obrigatório e já vira um pagamento confirmado (decisão de 11/11/2026).
 -- Cartão: a inscrição fica "Contato pendente" até a equipe registrar o pagamento.
 create or replace function public.criar_inscricao(dados jsonb)
 returns jsonb
@@ -312,7 +312,7 @@ begin
 
   if v_forma = 'PIX' then
     insert into public.pagamentos (inscricao_id, valor, forma, data_pagamento, informado_por, confirmado, comprovante)
-    values (v_id, v_turma.valor, 'PIX', (now() at time zone 'America/Sao_Paulo')::date, 'responsavel', false, v_comp);
+    values (v_id, v_turma.valor, 'PIX', (now() at time zone 'America/Sao_Paulo')::date, 'responsavel', true, v_comp);
   end if;
 
   return jsonb_build_object(
@@ -361,7 +361,7 @@ begin
 end;
 $$;
 
--- Responsável envia outro comprovante de PIX depois da inscrição (fica "Aguardando confirmação").
+-- Responsável envia outro comprovante de PIX depois da inscrição (já entra confirmado).
 drop function if exists public.informar_pagamento(bigint, text, numeric, text, date, text);
 create or replace function public.informar_pagamento(
   p_id bigint, p_telefone text, p_valor numeric, p_comprovante text, p_observacao text
@@ -394,7 +394,7 @@ begin
 
   insert into public.pagamentos (inscricao_id, valor, forma, data_pagamento, observacao, informado_por, confirmado, comprovante)
   values (p_id, p_valor, 'PIX', (now() at time zone 'America/Sao_Paulo')::date,
-          nullif(left(trim(coalesce(p_observacao, '')), 300), ''), 'responsavel', false, p_comprovante);
+          nullif(left(trim(coalesce(p_observacao, '')), 300), ''), 'responsavel', true, p_comprovante);
 end;
 $$;
 

@@ -4,9 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Inscrição — Colônia de Férias</title>
-  <link rel="stylesheet" href="style.css?v=2" />
+  <link rel="stylesheet" href="style.css?v=3" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js?v=2"></script>
+  <script src="config.js?v=3"></script>
 </head>
 <body>
   <header class="topo">
@@ -108,7 +108,7 @@
       <p><strong id="suc-aluno"></strong> — <span id="suc-turma"></span><br />Valor: <strong id="suc-valor"></strong></p>
 
       <div id="suc-pix" class="aviso ok oculto">
-        ✔ <strong>Comprovante do PIX recebido!</strong> A equipe vai conferir e confirmar o pagamento. Você pode acompanhar pela aba "Consultar inscrição".
+        ✔ <strong>Pagamento via PIX registrado!</strong> Recebemos o seu comprovante e a inscrição está confirmada. Você pode consultá-la a qualquer momento pela aba "Consultar inscrição".
       </div>
 
       <div id="suc-cartao" class="aviso alerta oculto">
@@ -404,7 +404,7 @@
       f.reset();
       aviso($('#msg-pagamento'), '');
       await consultar();
-      aviso($('#r-msg'), 'Comprovante enviado! A equipe vai conferir e confirmar em breve.', 'ok');
+      aviso($('#r-msg'), 'Comprovante enviado e pagamento registrado!', 'ok');
     } catch (err) {
       aviso($('#msg-pagamento'), err.message);
     } finally {
