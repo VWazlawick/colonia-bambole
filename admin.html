@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="robots" content="noindex" />
   <title>Admin — Colônia de Férias</title>
-  <link rel="stylesheet" href="style.css?v=2" />
+  <link rel="stylesheet" href="style.css?v=4" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js?v=2"></script>
+  <script src="config.js?v=4"></script>
 </head>
 <body>
   <header class="topo" style="padding-bottom:28px">
@@ -73,6 +73,17 @@
 
       <h3>Pagamentos</h3>
       <div id="d-pagamentos"></div>
+
+      <div id="d-cartao" class="cartao-rapido oculto">
+        <div>
+          <strong>💳 Pagamento no cartão</strong><br />
+          <span class="suave">Depois de receber pelo WhatsApp, confirme aqui. A inscrição passa para "Pago".</span>
+        </div>
+        <div class="acoes" style="margin-top:10px">
+          <button class="verde" onclick="confirmarCartao('Cartão de crédito')">✔ Recebido no crédito</button>
+          <button class="verde" onclick="confirmarCartao('Cartão de débito')">✔ Recebido no débito</button>
+        </div>
+      </div>
 
       <div id="d-novo">
         <h3>Registrar pagamento recebido</h3>
@@ -236,6 +247,9 @@
       : '<p class="suave">Nenhum pagamento registrado.</p>';
 
     $('#d-novo').classList.toggle('oculto', i.cancelada);
+    // Cartão com saldo em aberto: atalho de um clique para confirmar o pagamento
+    $('#d-cartao').classList.toggle('oculto', !(i.forma_pagamento === 'Cartão' && !i.cancelada && Number(i.saldo) > 0));
+    $('#d-cartao .suave').textContent = `Depois de receber ${brl(i.saldo)} pelo WhatsApp, confirme aqui. A inscrição passa para "Pago".`;
     const f = $('#form-pag');
     f.reset();
     f.valor.value = Number(i.saldo) ? Number(i.saldo).toFixed(2) : '';
@@ -272,6 +286,20 @@
     if (!confirm('Excluir este pagamento? O comprovante anexado também será apagado.')) return;
     await apagarArquivos([pagamentoPorId(pid)?.comprovante]);
     await q(sb.from('pagamentos').delete().eq('id', pid));
+  });
+
+  // Registra o saldo da inscrição como pago no cartão, com a data de hoje.
+  const confirmarCartao = (forma) => acao(async () => {
+    const i = inscricoes.find((x) => x.id === atual);
+    if (!confirm(`Confirmar o recebimento de ${brl(i.saldo)} no ${forma.toLowerCase()} para a inscrição nº ${i.id}?`)) return;
+    await q(sb.from('pagamentos').insert({
+      inscricao_id: i.id,
+      valor: Number(i.saldo),
+      forma,
+      data_pagamento: hoje(),
+      informado_por: 'admin',
+      confirmado: true,
+    }));
   });
 
   const pagamentoPorId = (pid) => inscricoes.flatMap((i) => i.pagamentos).find((p) => p.id === pid);

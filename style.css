@@ -172,3 +172,12 @@ input[type=file] { padding: 8px; background: #fffaf4; }
 .botao.whatsapp { background: #25a35a; }
 .botao.whatsapp:hover { background: #1d8a4b; }
 .selo.Contato { background: #fff1cc; color: #7a5600; }
+.cartao-rapido {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #fff4d6;
+  border: 1.5px solid #f3d27a;
+}
+.nota-pagamento { margin: 0 0 12px; padding: 10px 12px; border-radius: 10px; background: #f1f8ff; color: #1b4f80; font-size: .92rem; }
+.opcao.desabilitada { opacity: .55; cursor: not-allowed; background: #f6f3ee; }

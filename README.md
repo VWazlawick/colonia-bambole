@@ -27,8 +27,8 @@ em `index.html`, `admin.html` e `aviso-privacidade.html`. Sem isso, o navegador 
 pode continuar usando o arquivo antigo (o GitHub Pages guarda cache por até 10 minutos).
 
 ## Pagamento
-- **PIX:** o responsável paga e anexa o comprovante (foto ou PDF, até 5 MB) na própria inscrição — sem comprovante, a inscrição não é aceita. A situação fica *Aguardando confirmação* até a equipe abrir o comprovante no painel (📎) e clicar em **Confirmar**.
-- **Cartão:** a inscrição fica *Contato pendente* e o responsável é orientado a chamar a equipe no WhatsApp. Depois de receber, a equipe registra o pagamento no painel.
+- **PIX:** o responsável paga e anexa o comprovante (foto ou PDF, até 5 MB) na própria inscrição — sem comprovante, a inscrição não é aceita. Com o comprovante, o pagamento **já entra confirmado** e a inscrição fica *Pago*. O comprovante continua disponível no painel (📎); se algum for inválido, exclua aquele pagamento e a inscrição volta a ficar em aberto.
+- **Cartão:** só no pacote de **2 semanas** (inscrições de 1 semana: somente PIX — regra no banco, coluna `turmas.aceita_cartao`). A inscrição fica *Contato pendente* e o responsável é orientado a chamar a equipe no WhatsApp. Depois de receber, no painel: filtre **Contato pendente** → abra a inscrição → **✔ Recebido no crédito** (ou **no débito**). A inscrição passa para *Pago*.
 - Os comprovantes ficam no Supabase Storage (bucket privado `comprovantes`); só administradores conseguem abrir.
 
 ## Onde mudar cada coisa

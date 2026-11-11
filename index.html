@@ -4,9 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Inscrição — Colônia de Férias</title>
-  <link rel="stylesheet" href="style.css?v=2" />
+  <link rel="stylesheet" href="style.css?v=4" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js?v=2"></script>
+  <script src="config.js?v=4"></script>
 </head>
 <body>
   <header class="topo">
@@ -54,14 +54,15 @@
         <select name="turma" id="turma" required><option value="">Carregando turmas...</option></select>
 
         <h3>Forma de pagamento</h3>
+        <p class="nota-pagamento">💡 <strong>Inscrições de 1 semana: pagamento somente via PIX.</strong> O cartão está disponível apenas para o pacote de 2 semanas.</p>
         <div class="opcoes-pagamento">
           <label class="opcao">
             <input type="radio" name="forma_pagamento" value="PIX" required />
             <span><strong>PIX</strong><br /><span class="suave">Pague agora e anexe o comprovante</span></span>
           </label>
-          <label class="opcao">
+          <label class="opcao" id="opcao-cartao">
             <input type="radio" name="forma_pagamento" value="Cartão" />
-            <span><strong>Cartão</strong><br /><span class="suave">Combine o pagamento com a equipe pelo WhatsApp</span></span>
+            <span><strong>Cartão</strong><br /><span class="suave" id="cartao-desc">Combine o pagamento com a equipe pelo WhatsApp</span></span>
           </label>
         </div>
 
@@ -108,7 +109,7 @@
       <p><strong id="suc-aluno"></strong> — <span id="suc-turma"></span><br />Valor: <strong id="suc-valor"></strong></p>
 
       <div id="suc-pix" class="aviso ok oculto">
-        ✔ <strong>Comprovante do PIX recebido!</strong> A equipe vai conferir e confirmar o pagamento. Você pode acompanhar pela aba "Consultar inscrição".
+        ✔ <strong>Pagamento via PIX registrado!</strong> Recebemos o seu comprovante e a inscrição está confirmada. Você pode consultá-la a qualquer momento pela aba "Consultar inscrição".
       </div>
 
       <div id="suc-cartao" class="aviso alerta oculto">
@@ -190,6 +191,7 @@
   const $ = (s) => document.querySelector(s);
   let consultaAtual = null;
   let valoresTurma = {};
+  let cartaoPorTurma = {};
 
   function aviso(el, msg, tipo = 'erro') {
     el.textContent = msg;
@@ -262,6 +264,15 @@
 
   function atualizarPagamento() {
     const f = $('#form-inscricao');
+    // Cartão só para turmas que aceitam (pacote de 2 semanas); se trocar para 1 semana, desmarca.
+    const radioCartao = f.querySelector('input[value="Cartão"]');
+    const semCartao = !!f.turma.value && cartaoPorTurma[f.turma.value] === false;
+    radioCartao.disabled = semCartao;
+    if (semCartao && radioCartao.checked) radioCartao.checked = false;
+    $('#opcao-cartao').classList.toggle('desabilitada', semCartao);
+    $('#cartao-desc').textContent = semCartao
+      ? 'Indisponível para 1 semana — somente no pacote de 2 semanas'
+      : 'Combine o pagamento com a equipe pelo WhatsApp';
     const forma = f.forma_pagamento.value;
     $('#bloco-pix').classList.toggle('oculto', forma !== 'PIX');
     $('#bloco-cartao').classList.toggle('oculto', forma !== 'Cartão');
@@ -274,6 +285,7 @@
     try {
       const turmas = await rpc('turmas_disponiveis');
       valoresTurma = Object.fromEntries(turmas.map((t) => [t.id, t.valor]));
+      cartaoPorTurma = Object.fromEntries(turmas.map((t) => [t.id, t.aceita_cartao]));
       const sel = $('#turma'), atual = sel.value;
       sel.innerHTML = '<option value="">Selecione...</option>' + turmas
         .map((t) => `<option value="${esc(t.id)}" ${t.restantes ? '' : 'disabled'}>${esc(t.nome)} — ${brl(t.valor)}${t.restantes ? '' : ' (ESGOTADA)'}</option>`)
@@ -404,7 +416,7 @@
       f.reset();
       aviso($('#msg-pagamento'), '');
       await consultar();
-      aviso($('#r-msg'), 'Comprovante enviado! A equipe vai conferir e confirmar em breve.', 'ok');
+      aviso($('#r-msg'), 'Comprovante enviado e pagamento registrado!', 'ok');
     } catch (err) {
       aviso($('#msg-pagamento'), err.message);
     } finally {
