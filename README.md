@@ -22,10 +22,15 @@ Pais / Equipe ──▶ GitHub Pages (páginas)  ──▶  Supabase (PostgreSQL
 2. `git push` e abra um Pull Request no GitHub.
 3. Ao fazer o merge na `main`, o GitHub Pages publica em 1–2 minutos.
 
+## Pagamento
+- **PIX:** o responsável paga e anexa o comprovante (foto ou PDF, até 5 MB) na própria inscrição — sem comprovante, a inscrição não é aceita. A situação fica *Aguardando confirmação* até a equipe abrir o comprovante no painel (📎) e clicar em **Confirmar**.
+- **Cartão:** a inscrição fica *Contato pendente* e o responsável é orientado a chamar a equipe no WhatsApp. Depois de receber, a equipe registra o pagamento no painel.
+- Os comprovantes ficam no Supabase Storage (bucket privado `comprovantes`); só administradores conseguem abrir.
+
 ## Onde mudar cada coisa
 - **Turmas, valores, vagas por turma:** Supabase → Table Editor → `turmas` (`ativa = false` tira do formulário).
 - **Total de vagas, data de início, faixa de idade:** Supabase → Table Editor → `configuracao`.
-- **Nome, período, PIX, contato de privacidade:** `config.js`.
+- **Nome, período, PIX, WhatsApp da equipe, contato de privacidade:** `config.js`.
 - **Estrutura do banco:** `schema.sql` (pode ser rodado de novo no SQL Editor sem apagar dados).
 
 ## Administradores

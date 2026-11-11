@@ -11,6 +11,9 @@ window.CONFIG = {
   periodo: '04/01/2027 a 15/01/2027',
   // Vagas, idades e turmas ficam no banco (tabelas configuracao e turmas).
 
+  // WhatsApp da equipe (DDD + número, só dígitos): pagamento com cartão e dúvidas.
+  whatsappAdmin: '45988083059',
+
   // LGPD — dados exibidos no Aviso de Privacidade (aviso-privacidade.html).
   // Ao mudar o texto do aviso, mude também a versão (fica gravada em cada inscrição).
   privacidade: {
@@ -18,7 +21,7 @@ window.CONFIG = {
     controlador: 'Colônia de Férias Bambolê',
     cnpj: '43.004.783/0001-94',
     encarregado: 'Cristiane Wazlawick',
-    contato: 'PREENCHER: e-mail ou WhatsApp para assuntos de privacidade',
+    contato: 'WhatsApp (45) 98808-3059',
     guardarAte: '15/07/2027', // 6 meses após o fim da colônia
   },
 
@@ -27,7 +30,8 @@ window.CONFIG = {
     chavePix: '43004783000194',
     tipoChave: 'CNPJ',
     favorecido: 'Cristiane Wazlawick',
-    // Se mudar esta lista, mude também em supabase/schema.sql (tabela pagamentos).
+    // Formas que a equipe pode registrar no painel (os pais escolhem só PIX ou Cartão).
+    // Se mudar esta lista, mude também em schema.sql (tabela pagamentos).
     formas: ['PIX', 'Dinheiro', 'Cartão de crédito', 'Cartão de débito', 'Transferência', 'Boleto'],
   },
 };

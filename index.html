@@ -23,7 +23,7 @@
 
     <div class="abas">
       <button id="aba-inscrever" class="ativa" onclick="mostrarAba('inscrever')">📝 Nova inscrição</button>
-      <button id="aba-consultar" onclick="mostrarAba('consultar')">💳 Consultar / informar pagamento</button>
+      <button id="aba-consultar" onclick="mostrarAba('consultar')">🔎 Consultar inscrição</button>
     </div>
 
     <!-- ===== Nova inscrição ===== -->
@@ -53,6 +53,35 @@
         <h3>Turma</h3>
         <select name="turma" id="turma" required><option value="">Carregando turmas...</option></select>
 
+        <h3>Forma de pagamento</h3>
+        <div class="opcoes-pagamento">
+          <label class="opcao">
+            <input type="radio" name="forma_pagamento" value="PIX" required />
+            <span><strong>PIX</strong><br /><span class="suave">Pague agora e anexe o comprovante</span></span>
+          </label>
+          <label class="opcao">
+            <input type="radio" name="forma_pagamento" value="Cartão" />
+            <span><strong>Cartão</strong><br /><span class="suave">Combine o pagamento com a equipe pelo WhatsApp</span></span>
+          </label>
+        </div>
+
+        <div id="bloco-pix" class="oculto">
+          <div class="pix">
+            <strong>Pagamento via PIX</strong> — valor: <strong class="valor-turma">escolha a turma</strong><br />
+            Chave (<span class="tipo-chave"></span>): <code class="chave-pix"></code>
+            <button type="button" class="secundario pequeno" onclick="copiarPix(this)">📋 Copiar</button><br />
+            Favorecido: <span class="favorecido"></span>
+          </div>
+          <label>Comprovante do PIX * <span class="opc">(foto ou PDF, até 5 MB)</span></label>
+          <input type="file" name="comprovante" accept="image/*,application/pdf" />
+        </div>
+
+        <div id="bloco-cartao" class="aviso alerta oculto">
+          💳 <strong>Pagamento com cartão:</strong> depois de enviar a inscrição, chame a equipe no WhatsApp
+          <strong class="whatsapp-admin"></strong> para fazer o pagamento.
+          <strong>A inscrição só é validada depois desse contato.</strong>
+        </div>
+
         <div style="margin-top:16px">
           <label class="check"><input type="checkbox" name="autoriza_imagem" /> <span>Autorizo o uso da imagem do aluno em fotos e vídeos da colônia. <span class="opc">(opcional — pode ser retirada a qualquer momento)</span></span></label>
         </div>
@@ -70,21 +99,26 @@
       </form>
     </section>
 
-    <!-- ===== Inscrição confirmada ===== -->
+    <!-- ===== Inscrição enviada ===== -->
     <section id="sec-sucesso" class="cartao oculto">
-      <h2>🎉 Inscrição realizada!</h2>
+      <h2 id="suc-titulo">🎉 Inscrição realizada!</h2>
       <p>Número da inscrição:</p>
       <div class="numero" id="suc-numero"></div>
-      <p class="suave">Guarde este número. Com ele e o telefone cadastrado você consulta a inscrição e informa o pagamento.</p>
+      <p class="suave">Guarde este número. Com ele e o telefone cadastrado você acompanha a inscrição na aba "Consultar inscrição".</p>
       <p><strong id="suc-aluno"></strong> — <span id="suc-turma"></span><br />Valor: <strong id="suc-valor"></strong></p>
-      <div class="pix">
-        <strong>Pagamento via PIX</strong><br />
-        Chave (<span class="tipo-chave"></span>): <code class="chave-pix"></code>
-        <button type="button" class="secundario pequeno" onclick="copiarPix(this)">📋 Copiar</button><br />
-        Favorecido: <span class="favorecido"></span>
+
+      <div id="suc-pix" class="aviso ok oculto">
+        ✔ <strong>Comprovante do PIX recebido!</strong> A equipe vai conferir e confirmar o pagamento. Você pode acompanhar pela aba "Consultar inscrição".
       </div>
+
+      <div id="suc-cartao" class="aviso alerta oculto">
+        <strong>⚠️ Falta um passo:</strong> chame a equipe no WhatsApp <strong class="whatsapp-admin"></strong> para pagar com cartão.
+        A inscrição só é validada depois desse contato.
+        <div class="acoes"><a id="link-whatsapp" class="botao whatsapp" target="_blank" rel="noopener">💬 Falar no WhatsApp</a></div>
+      </div>
+
       <div class="acoes">
-        <button onclick="irParaPagamento()">Já paguei — informar pagamento</button>
+        <button class="secundario" onclick="irParaConsulta()">Consultar inscrição</button>
         <button class="secundario" onclick="novaInscricao()">Fazer outra inscrição</button>
       </div>
     </section>
@@ -104,33 +138,42 @@
         <div class="info">
           <div><span>Aluno</span><strong id="r-aluno"></strong></div>
           <div><span>Turma</span><span id="r-turma" style="color:inherit;font-size:inherit"></span></div>
+          <div><span>Forma de pagamento</span><strong id="r-forma"></strong></div>
           <div><span>Valor total</span><strong id="r-valor"></strong></div>
           <div><span>Pago (confirmado)</span><strong id="r-pago"></strong></div>
           <div><span>Saldo</span><strong id="r-saldo"></strong></div>
           <div><span>Situação</span><span id="r-status"></span></div>
         </div>
         <div id="r-pagamentos"></div>
+        <div id="r-msg" class="aviso oculto"></div>
 
-        <div id="bloco-informar">
+        <!-- Cartão: orienta o contato com a equipe -->
+        <div id="r-cartao" class="aviso alerta oculto">
+          💳 Para pagar com cartão, chame a equipe no WhatsApp <strong class="whatsapp-admin"></strong>.
+          A inscrição só é validada depois desse contato.
+          <div class="acoes"><a id="r-link-whatsapp" class="botao whatsapp" target="_blank" rel="noopener">💬 Falar no WhatsApp</a></div>
+        </div>
+
+        <!-- PIX: enviar (outro) comprovante -->
+        <div id="r-pix" class="oculto">
           <div class="pix">
             <strong>Pagamento via PIX</strong><br />
             Chave (<span class="tipo-chave"></span>): <code class="chave-pix"></code>
             <button type="button" class="secundario pequeno" onclick="copiarPix(this)">📋 Copiar</button><br />
             Favorecido: <span class="favorecido"></span>
           </div>
-          <h3>Informar pagamento</h3>
+          <h3>Enviar comprovante de PIX</h3>
           <form id="form-pagamento">
             <div class="grade">
-              <div><label>Valor pago (R$)</label><input name="valor" type="number" step="0.01" min="0.01" required /></div>
-              <div><label>Forma de pagamento</label><select name="forma" id="formas" required></select></div>
-              <div><label>Data do pagamento</label><input name="data_pagamento" type="date" required /></div>
+              <div><label>Valor pago (R$) *</label><input name="valor" type="number" step="0.01" min="0.01" required /></div>
+              <div><label>Comprovante * <span class="opc">(foto ou PDF, até 5 MB)</span></label><input type="file" name="comprovante" accept="image/*,application/pdf" required /></div>
             </div>
             <div style="margin-top:14px">
-              <label>Observação <span class="opc">(ex.: nome de quem pagou, nº do comprovante)</span></label>
+              <label>Observação <span class="opc">(opcional)</span></label>
               <input name="observacao" />
             </div>
             <div id="msg-pagamento" class="aviso oculto"></div>
-            <div class="acoes"><button type="submit">Enviar informação de pagamento</button></div>
+            <div class="acoes"><button type="submit">Enviar comprovante</button></div>
           </form>
         </div>
       </div>
@@ -145,8 +188,8 @@
   const dataBR = (d) => (d ? d.split('-').reverse().join('/') : '');
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const $ = (s) => document.querySelector(s);
-  const hoje = () => new Date().toLocaleDateString('sv-SE');
   let consultaAtual = null;
+  let valoresTurma = {};
 
   function aviso(el, msg, tipo = 'erro') {
     el.textContent = msg;
@@ -166,10 +209,10 @@
     $('#titulo').textContent = `☀️ ${C.nomeColonia}`;
     $('#edicao').textContent = C.edicao || '';
     $('#periodo').textContent = C.periodo || '';
-    $('#formas').innerHTML = C.pagamento.formas.map((f) => `<option>${esc(f)}</option>`).join('');
     document.querySelectorAll('.chave-pix').forEach((e) => (e.textContent = formatarChave(C.pagamento.chavePix)));
     document.querySelectorAll('.tipo-chave').forEach((e) => (e.textContent = C.pagamento.tipoChave || 'PIX'));
     document.querySelectorAll('.favorecido').forEach((e) => (e.textContent = C.pagamento.favorecido));
+    document.querySelectorAll('.whatsapp-admin').forEach((e) => (e.textContent = formatarFone(C.whatsappAdmin)));
     $('#aviso-config').classList.toggle('oculto', window.configurado);
   }
 
@@ -179,6 +222,11 @@
     if (/^\d{11}$/.test(c)) return c.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4');
     return c;
   }
+  const formatarFone = (t) => String(t).replace(/^(\d{2})(\d{4,5})(\d{4})$/, '($1) $2-$3');
+
+  // Link do WhatsApp da equipe já com a mensagem (só o nº da inscrição, sem dados pessoais).
+  const linkWhatsapp = (id) =>
+    `https://wa.me/55${C.whatsappAdmin}?text=${encodeURIComponent(`Olá! Fiz a inscrição nº ${id} na ${C.nomeColonia} e quero pagar com cartão.`)}`;
 
   async function copiarPix(btn) {
     try {
@@ -198,12 +246,40 @@
     return d.toLocaleDateString('sv-SE');
   }
 
+  // Envia o comprovante para o armazenamento privado e devolve o caminho do arquivo.
+  async function enviarComprovante(arquivo) {
+    if (!arquivo || !arquivo.size) throw new Error('Anexe o comprovante do PIX.');
+    if (arquivo.size > 5 * 1024 * 1024) throw new Error('O comprovante deve ter no máximo 5 MB.');
+    const ext = (arquivo.name.split('.').pop() || '').toLowerCase();
+    if (!['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif', 'pdf'].includes(ext)) {
+      throw new Error('Envie o comprovante como foto (JPG, PNG) ou PDF.');
+    }
+    const caminho = `pix/${crypto.randomUUID()}.${ext}`;
+    const { error } = await sb.storage.from('comprovantes').upload(caminho, arquivo, { contentType: arquivo.type || undefined });
+    if (error) throw new Error('Não foi possível enviar o comprovante. Tente novamente ou envie como JPG/PDF.');
+    return caminho;
+  }
+
+  function atualizarPagamento() {
+    const f = $('#form-inscricao');
+    const forma = f.forma_pagamento.value;
+    $('#bloco-pix').classList.toggle('oculto', forma !== 'PIX');
+    $('#bloco-cartao').classList.toggle('oculto', forma !== 'Cartão');
+    f.comprovante.required = forma === 'PIX';
+    const valor = valoresTurma[f.turma.value];
+    $('#bloco-pix .valor-turma').textContent = valor ? brl(valor) : 'escolha a turma';
+  }
+
   async function carregarTurmas() {
     try {
       const turmas = await rpc('turmas_disponiveis');
-      $('#turma').innerHTML = '<option value="">Selecione...</option>' + turmas
+      valoresTurma = Object.fromEntries(turmas.map((t) => [t.id, t.valor]));
+      const sel = $('#turma'), atual = sel.value;
+      sel.innerHTML = '<option value="">Selecione...</option>' + turmas
         .map((t) => `<option value="${esc(t.id)}" ${t.restantes ? '' : 'disabled'}>${esc(t.nome)} — ${brl(t.valor)}${t.restantes ? '' : ' (ESGOTADA)'}</option>`)
         .join('');
+      sel.value = atual;
+      atualizarPagamento();
       if (!turmas.length) return;
       const g = turmas[0];
       $('#periodo').textContent = `${C.periodo} · Crianças de ${g.idade_min} a ${g.idade_max} anos`;
@@ -220,21 +296,35 @@
     }
   }
 
+  $('#form-inscricao').addEventListener('change', (e) => {
+    if (['forma_pagamento', 'turma'].includes(e.target.name)) atualizarPagamento();
+  });
+
   $('#form-inscricao').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const f = e.target, btn = f.querySelector('button');
+    const f = e.target, btn = f.querySelector('button[type=submit]');
     const dados = Object.fromEntries(new FormData(f));
+    delete dados.comprovante;
     dados.autoriza_imagem = f.autoriza_imagem.checked;
     dados.consentimento = f.consentimento.checked;
     dados.versao_aviso = C.privacidade.versaoAviso;
     btn.disabled = true;
+    btn.textContent = 'Enviando...';
     try {
+      if (dados.forma_pagamento === 'PIX') dados.comprovante = await enviarComprovante(f.comprovante.files[0]);
       const i = await rpc('criar_inscricao', { dados });
+      const cartao = i.forma_pagamento === 'Cartão';
+      $('#suc-titulo').textContent = cartao ? '📝 Inscrição recebida!' : '🎉 Inscrição realizada!';
       $('#suc-numero').textContent = i.id;
       $('#suc-aluno').textContent = i.aluno_nome;
       $('#suc-turma').textContent = i.turma_nome;
       $('#suc-valor').textContent = brl(i.valor);
+      $('#suc-pix').classList.toggle('oculto', cartao);
+      $('#suc-cartao').classList.toggle('oculto', !cartao);
+      $('#link-whatsapp').href = linkWhatsapp(i.id);
       consultaAtual = { id: i.id, telefone: i.responsavel_telefone };
+      f.reset();
+      atualizarPagamento();
       $('#sec-inscrever').classList.add('oculto');
       $('#sec-sucesso').classList.remove('oculto');
       aviso($('#erro-inscricao'), '');
@@ -244,15 +334,17 @@
       aviso($('#erro-inscricao'), err.message);
     } finally {
       btn.disabled = false;
+      btn.textContent = 'Confirmar inscrição';
     }
   });
 
   function novaInscricao() {
     $('#form-inscricao').reset();
+    atualizarPagamento();
     mostrarAba('inscrever');
   }
 
-  function irParaPagamento() {
+  function irParaConsulta() {
     mostrarAba('consultar');
     const f = $('#form-consulta');
     f.id.value = consultaAtual.id;
@@ -270,44 +362,49 @@
       $('#r-id').textContent = i.id;
       $('#r-aluno').textContent = i.aluno_nome;
       $('#r-turma').textContent = i.turma_nome;
+      $('#r-forma').textContent = i.forma_pagamento || '—';
       $('#r-valor').textContent = brl(i.valor);
       $('#r-pago').textContent = brl(i.valor_pago);
       $('#r-saldo').textContent = brl(i.saldo);
       $('#r-status').innerHTML = `<span class="selo ${i.status.split(' ')[0]}">${esc(i.status)}</span>`;
       $('#r-pagamentos').innerHTML = i.pagamentos.length
-        ? '<h3>Pagamentos informados</h3><div class="tabela-rolagem"><table><tr><th>Data</th><th>Valor</th><th>Forma</th><th>Situação</th></tr>' +
-          i.pagamentos.map((p) => `<tr><td>${dataBR(p.data_pagamento)}</td><td>${brl(p.valor)}</td><td>${esc(p.forma)}</td><td>${p.confirmado ? '<span class="selo Pago">Confirmado</span>' : '<span class="selo Aguardando">Aguardando confirmação</span>'}</td></tr>`).join('') +
+        ? '<h3>Pagamentos</h3><div class="tabela-rolagem"><table><tr><th>Data</th><th>Valor</th><th>Forma</th><th>Situação</th></tr>' +
+          i.pagamentos.map((p) => `<tr><td>${dataBR(p.data_pagamento)}</td><td>${brl(p.valor)}</td><td>${esc(p.forma)}${p.com_comprovante ? ' 📎' : ''}</td><td>${p.confirmado ? '<span class="selo Pago">Confirmado</span>' : '<span class="selo Aguardando">Aguardando confirmação</span>'}</td></tr>`).join('') +
           '</table></div>'
         : '';
-      const podeInformar = i.status !== 'Pago' && i.status !== 'Cancelada';
-      $('#bloco-informar').classList.toggle('oculto', !podeInformar);
+      const aberta = i.status !== 'Pago' && i.status !== 'Cancelada';
+      const cartao = i.forma_pagamento === 'Cartão';
+      $('#r-cartao').classList.toggle('oculto', !(aberta && cartao));
+      $('#r-link-whatsapp').href = linkWhatsapp(i.id);
+      // PIX: só pede novo comprovante se ainda houver saldo e nada aguardando conferência
+      $('#r-pix').classList.toggle('oculto', !(aberta && !cartao && i.status !== 'Aguardando confirmação'));
       const fp = $('#form-pagamento');
-      fp.valor.value = i.saldo ? Number(i.saldo).toFixed(2) : '';
-      if (!fp.data_pagamento.value) fp.data_pagamento.value = hoje();
+      fp.valor.value = Number(i.saldo) ? Number(i.saldo).toFixed(2) : '';
     } catch (err) {
       $('#resultado').classList.add('oculto');
       aviso($('#erro-consulta'), err.message);
     }
   }
 
-  $('#form-consulta').addEventListener('submit', (e) => { e.preventDefault(); consultar(); });
+  $('#form-consulta').addEventListener('submit', (e) => { e.preventDefault(); aviso($('#r-msg'), ''); consultar(); });
 
   $('#form-pagamento').addEventListener('submit', async (e) => {
     e.preventDefault();
     const f = e.target, btn = f.querySelector('button');
     btn.disabled = true;
     try {
+      const comprovante = await enviarComprovante(f.comprovante.files[0]);
       await rpc('informar_pagamento', {
         p_id: consultaAtual.id,
         p_telefone: consultaAtual.telefone,
         p_valor: Number(f.valor.value),
-        p_forma: f.forma.value,
-        p_data: f.data_pagamento.value,
+        p_comprovante: comprovante,
         p_observacao: f.observacao.value,
       });
-      f.observacao.value = '';
+      f.reset();
+      aviso($('#msg-pagamento'), '');
       await consultar();
-      aviso($('#msg-pagamento'), 'Pagamento informado! A equipe vai conferir e confirmar em breve.', 'ok');
+      aviso($('#r-msg'), 'Comprovante enviado! A equipe vai conferir e confirmar em breve.', 'ok');
     } catch (err) {
       aviso($('#msg-pagamento'), err.message);
     } finally {

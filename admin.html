@@ -48,7 +48,7 @@
         <input id="busca" placeholder="Buscar por aluno, responsável, telefone ou nº..." />
         <select id="f-status">
           <option value="">Todas as situações</option>
-          <option>Pendente</option><option>Aguardando confirmação</option><option>Parcial</option><option>Pago</option><option>Cancelada</option>
+          <option>Pendente</option><option>Contato pendente</option><option>Aguardando confirmação</option><option>Parcial</option><option>Pago</option><option>Cancelada</option>
         </select>
         <select id="f-turma"><option value="">Todas as turmas</option></select>
         <button onclick="exportarCsv()">⬇ Exportar Excel (CSV)</button>
@@ -200,7 +200,7 @@
         <td><strong>${i.id}</strong></td>
         <td>${esc(i.aluno_nome)}</td>
         <td>${esc(i.responsavel_nome)}<br><span class="suave">${fone(i.responsavel_telefone)}</span></td>
-        <td>${esc(i.turma_nome)}</td>
+        <td>${esc(i.turma_nome)}<br><span class="suave">${esc(i.forma_pagamento)}</span></td>
         <td>${brl(i.valor)}</td>
         <td>${brl(i.valor_pago)}</td>
         <td>${selo(i.status)}</td>
@@ -217,7 +217,7 @@
       campo('Aluno', i.aluno_nome), campo('Nascimento', dataBR(i.aluno_nascimento)), campo('Escola', i.aluno_escola),
       campo('Saúde / cuidados', i.aluno_saude), campo('Responsável', i.responsavel_nome), campo('CPF', i.responsavel_cpf),
       campo('Telefone', fone(i.responsavel_telefone)), campo('E-mail', i.responsavel_email), campo('Emergência', i.contato_emergencia),
-      campo('Turma', i.turma_nome), campo('Uso de imagem', i.autoriza_imagem ? 'Autorizado' : 'Não autorizado'),
+      campo('Turma', i.turma_nome), campo('Forma de pagamento', i.forma_pagamento), campo('Uso de imagem', i.autoriza_imagem ? 'Autorizado' : 'Não autorizado'),
       campo('Inscrito em', dataHoraBR(i.criado_em)),
       campo('Consentimento LGPD', i.consentimento_em ? `${dataHoraBR(i.consentimento_em)} (aviso ${dataBR(i.versao_aviso)})` : ''),
       ...(i.anonimizada_em ? [campo('Dados removidos em', dataHoraBR(i.anonimizada_em))] : []),
@@ -229,6 +229,7 @@
           <td>${dataBR(p.data_pagamento)}</td><td>${brl(p.valor)}</td><td>${esc(p.forma)}</td><td>${esc(p.observacao)}</td>
           <td>${p.informado_por === 'responsavel' ? 'Responsável' : 'Equipe'}</td>
           <td style="white-space:nowrap">
+            ${p.comprovante ? `<button class="secundario pequeno" onclick="verComprovante(${p.id})">📎 Comprovante</button>` : ''}
             ${p.confirmado ? '<span class="selo Pago">Confirmado</span>' : `<button class="verde pequeno" onclick="confirmar(${p.id})">✔ Confirmar</button>`}
             <button class="perigo pequeno" onclick="excluir(${p.id})" title="Excluir">✕</button>
           </td></tr>`).join('') + '</table></div>'
@@ -249,7 +250,8 @@
     const bl = $('#btn-lgpd');
     bl.classList.toggle('oculto', !!i.anonimizada_em);
     bl.onclick = () => acao(async () => {
-      if (!confirm(`Apagar os dados pessoais da inscrição nº ${i.id}?\n\nNome, nascimento, saúde, CPF, telefone, e-mail e contatos serão apagados definitivamente. Ficam só a turma, o valor e os pagamentos.\n\nUse quando o responsável pedir a exclusão (LGPD) ou após o prazo de guarda. Não dá para desfazer.`)) return;
+      if (!confirm(`Apagar os dados pessoais da inscrição nº ${i.id}?\n\nNome, nascimento, saúde, CPF, telefone, e-mail, contatos e comprovantes serão apagados definitivamente. Ficam só a turma, o valor e os pagamentos.\n\nUse quando o responsável pedir a exclusão (LGPD) ou após o prazo de guarda. Não dá para desfazer.`)) return;
+      await apagarArquivos(i.pagamentos.map((p) => p.comprovante));
       await rpc('anonimizar_inscricao', { p_id: i.id });
     });
     if (!detalhe.open) detalhe.showModal();
@@ -267,9 +269,32 @@
 
   const confirmar = (pid) => acao(() => q(sb.from('pagamentos').update({ confirmado: true }).eq('id', pid)));
   const excluir = (pid) => acao(async () => {
-    if (!confirm('Excluir este pagamento?')) return;
+    if (!confirm('Excluir este pagamento? O comprovante anexado também será apagado.')) return;
+    await apagarArquivos([pagamentoPorId(pid)?.comprovante]);
     await q(sb.from('pagamentos').delete().eq('id', pid));
   });
+
+  const pagamentoPorId = (pid) => inscricoes.flatMap((i) => i.pagamentos).find((p) => p.id === pid);
+
+  // Abre o comprovante com um link temporário (5 min): o arquivo não é público.
+  async function verComprovante(pid) {
+    const janela = window.open('', '_blank'); // abre já no clique, para o navegador não bloquear
+    try {
+      const { data, error } = await sb.storage.from('comprovantes').createSignedUrl(pagamentoPorId(pid).comprovante, 300);
+      if (error) throw error;
+      janela.location = data.signedUrl;
+    } catch (err) {
+      janela?.close();
+      mostrarErro($('#d-erro'), 'Não foi possível abrir o comprovante.');
+    }
+  }
+
+  async function apagarArquivos(caminhos) {
+    const lista = caminhos.filter(Boolean);
+    if (!lista.length) return;
+    const { error } = await sb.storage.from('comprovantes').remove(lista);
+    if (error) throw new Error('Não foi possível apagar o comprovante: ' + error.message);
+  }
 
   $('#form-pag').addEventListener('submit', (e) => {
     e.preventDefault();
@@ -290,7 +315,7 @@
     const colunas = {
       id: 'Nº', criado_em: 'Inscrito em', aluno_nome: 'Aluno', aluno_nascimento: 'Nascimento', aluno_escola: 'Escola',
       aluno_saude: 'Saúde', responsavel_nome: 'Responsável', responsavel_cpf: 'CPF', responsavel_telefone: 'Telefone',
-      responsavel_email: 'E-mail', contato_emergencia: 'Emergência', turma_nome: 'Turma', valor: 'Valor',
+      responsavel_email: 'E-mail', contato_emergencia: 'Emergência', turma_nome: 'Turma', forma_pagamento: 'Forma de pagamento', valor: 'Valor',
       valor_pago: 'Pago', saldo: 'Saldo', status: 'Situação', autoriza_imagem: 'Uso de imagem',
       consentimento_em: 'Consentimento LGPD',
     };
