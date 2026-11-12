@@ -7,9 +7,10 @@ window.CONFIG = {
   supabaseChavePublica: 'sb_publishable_iBQJL5IXQFgj-75xKKrvKw_Vh3zToZn',
 
   nomeColonia: 'Colônia de Férias Bambolê',
-  edicao: '9ª Edição · Pré-venda',
+  edicao: '9ª Edição', // provisório: o título de cada lote vem do banco (tabela lotes)
   periodo: '04/01/2027 a 15/01/2027',
-  // Vagas, idades e turmas ficam no banco (tabelas configuracao e turmas).
+  // Lotes (pré-venda, venda normal), preços, vagas, idades e turmas ficam no banco
+  // (tabelas lotes, precos, configuracao e turmas).
 
   // WhatsApp da equipe (DDD + número, só dígitos): pagamento com cartão e dúvidas.
   whatsappAdmin: '45988083059',

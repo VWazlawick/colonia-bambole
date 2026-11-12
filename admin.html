@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="robots" content="noindex" />
   <title>Admin — Colônia de Férias</title>
-  <link rel="stylesheet" href="style.css?v=4" />
+  <link rel="stylesheet" href="style.css?v=5" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js?v=4"></script>
+  <script src="config.js?v=5"></script>
 </head>
 <body>
   <header class="topo" style="padding-bottom:28px">
@@ -51,6 +51,7 @@
           <option>Pendente</option><option>Contato pendente</option><option>Aguardando confirmação</option><option>Parcial</option><option>Pago</option><option>Cancelada</option>
         </select>
         <select id="f-turma"><option value="">Todas as turmas</option></select>
+        <select id="f-lote"><option value="">Todos os lotes</option></select>
         <button onclick="exportarCsv()">⬇ Exportar Excel (CSV)</button>
       </div>
       <div class="tabela-rolagem">
@@ -195,15 +196,19 @@
     const sel = $('#f-turma'), v = sel.value;
     sel.innerHTML = '<option value="">Todas as turmas</option>' + turmas.map(([id, n]) => `<option value="${esc(id)}">${esc(n)}</option>`).join('');
     sel.value = v;
+    const lotes = [...new Map(inscricoes.map((i) => [i.lote, i.lote_nome])).entries()];
+    const selL = $('#f-lote'), vL = selL.value;
+    selL.innerHTML = '<option value="">Todos os lotes</option>' + lotes.map(([id, n]) => `<option value="${esc(id)}">${esc(n)}</option>`).join('');
+    selL.value = vL;
     desenhar();
     if (atual && detalhe.open) abrir(atual);
   }
 
   function desenhar() {
     const busca = $('#busca').value.toLowerCase().trim();
-    const st = $('#f-status').value, tu = $('#f-turma').value;
+    const st = $('#f-status').value, tu = $('#f-turma').value, lo = $('#f-lote').value;
     const lista = inscricoes.filter((i) =>
-      (!st || i.status === st) && (!tu || i.turma === tu) &&
+      (!st || i.status === st) && (!tu || i.turma === tu) && (!lo || i.lote === lo) &&
       (!busca || [i.id, i.aluno_nome, i.responsavel_nome, i.responsavel_telefone].join(' ').toLowerCase().includes(busca)));
     $('#vazio').classList.toggle('oculto', lista.length > 0);
     $('#lista').innerHTML = lista.map((i) => `
@@ -211,7 +216,7 @@
         <td><strong>${i.id}</strong></td>
         <td>${esc(i.aluno_nome)}</td>
         <td>${esc(i.responsavel_nome)}<br><span class="suave">${fone(i.responsavel_telefone)}</span></td>
-        <td>${esc(i.turma_nome)}<br><span class="suave">${esc(i.forma_pagamento)}</span></td>
+        <td>${esc(i.turma_nome)}<br><span class="suave">${esc(i.lote_nome)} · ${esc(i.forma_pagamento)}</span></td>
         <td>${brl(i.valor)}</td>
         <td>${brl(i.valor_pago)}</td>
         <td>${selo(i.status)}</td>
@@ -228,7 +233,7 @@
       campo('Aluno', i.aluno_nome), campo('Nascimento', dataBR(i.aluno_nascimento)), campo('Escola', i.aluno_escola),
       campo('Saúde / cuidados', i.aluno_saude), campo('Responsável', i.responsavel_nome), campo('CPF', i.responsavel_cpf),
       campo('Telefone', fone(i.responsavel_telefone)), campo('E-mail', i.responsavel_email), campo('Emergência', i.contato_emergencia),
-      campo('Turma', i.turma_nome), campo('Forma de pagamento', i.forma_pagamento), campo('Uso de imagem', i.autoriza_imagem ? 'Autorizado' : 'Não autorizado'),
+      campo('Turma', i.turma_nome), ...(i.dias ? [campo(`Dias (${i.dias.length})`, i.dias.map((d) => dataBR(d).slice(0, 5)).join(', '))] : []), campo('Lote', i.lote_nome), campo('Forma de pagamento', i.forma_pagamento), campo('Uso de imagem', i.autoriza_imagem ? 'Autorizado' : 'Não autorizado'),
       campo('Inscrito em', dataHoraBR(i.criado_em)),
       campo('Consentimento LGPD', i.consentimento_em ? `${dataHoraBR(i.consentimento_em)} (aviso ${dataBR(i.versao_aviso)})` : ''),
       ...(i.anonimizada_em ? [campo('Dados removidos em', dataHoraBR(i.anonimizada_em))] : []),
@@ -343,7 +348,7 @@
     const colunas = {
       id: 'Nº', criado_em: 'Inscrito em', aluno_nome: 'Aluno', aluno_nascimento: 'Nascimento', aluno_escola: 'Escola',
       aluno_saude: 'Saúde', responsavel_nome: 'Responsável', responsavel_cpf: 'CPF', responsavel_telefone: 'Telefone',
-      responsavel_email: 'E-mail', contato_emergencia: 'Emergência', turma_nome: 'Turma', forma_pagamento: 'Forma de pagamento', valor: 'Valor',
+      responsavel_email: 'E-mail', contato_emergencia: 'Emergência', turma_nome: 'Turma', dias: 'Dias', lote_nome: 'Lote', forma_pagamento: 'Forma de pagamento', valor: 'Valor',
       valor_pago: 'Pago', saldo: 'Saldo', status: 'Situação', autoriza_imagem: 'Uso de imagem',
       consentimento_em: 'Consentimento LGPD',
     };
@@ -351,6 +356,7 @@
     const formatar = (c, v) =>
       c === 'criado_em' || c === 'consentimento_em' ? dataHoraBR(v) :
       c === 'aluno_nascimento' ? dataBR(v) :
+      c === 'dias' ? (v || []).map((d) => dataBR(d).slice(0, 5)).join(', ') :
       c === 'autoriza_imagem' ? (v ? 'Sim' : 'Não') :
       ['valor', 'valor_pago', 'saldo'].includes(c) ? Number(v).toFixed(2).replace('.', ',') : v;
     const cel = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
@@ -362,7 +368,7 @@
     URL.revokeObjectURL(a.href);
   }
 
-  ['#busca', '#f-status', '#f-turma'].forEach((s) => $(s).addEventListener('input', desenhar));
+  ['#busca', '#f-status', '#f-turma', '#f-lote'].forEach((s) => $(s).addEventListener('input', desenhar));
   iniciar();
 </script>
 </body>

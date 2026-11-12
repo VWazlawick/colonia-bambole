@@ -26,14 +26,25 @@ Pais / Equipe ──▶ GitHub Pages (páginas)  ──▶  Supabase (PostgreSQL
 em `index.html`, `admin.html` e `aviso-privacidade.html`. Sem isso, o navegador de quem já visitou o site
 pode continuar usando o arquivo antigo (o GitHub Pages guarda cache por até 10 minutos).
 
+## Lotes de venda
+| Lote | Período | 1 semana | 2 semanas (PIX) | 2 semanas (cartão) | Diárias | Vagas |
+|---|---|---|---|---|---|---|
+| Pré-venda | até 12/11/2026 12h | R$ 380 | R$ 700 | R$ 700 (via WhatsApp) | — | 30 |
+| Venda normal | a partir de 12/11/2026 12h | R$ 430 | R$ 800 | R$ 860 = R$ 430 PIX + R$ 430 cartão | R$ 100/dia; 3+ dias R$ 90/dia | sem limite |
+
+- O endereço principal mostra sozinho o lote em vigor. `?lote=normal` (ou `?lote=pre-venda`) abre um lote específico; antes de abrir, mostra a data e bloqueia o envio.
+- Diárias: os 10 dias úteis da colônia (tabela `dias_colonia`); somente PIX.
+
 ## Pagamento
 - **PIX:** o responsável paga e anexa o comprovante (foto ou PDF, até 5 MB) na própria inscrição — sem comprovante, a inscrição não é aceita. Com o comprovante, o pagamento **já entra confirmado** e a inscrição fica *Pago*. O comprovante continua disponível no painel (📎); se algum for inválido, exclua aquele pagamento e a inscrição volta a ficar em aberto.
-- **Cartão:** só no pacote de **2 semanas** (inscrições de 1 semana: somente PIX — regra no banco, coluna `turmas.aceita_cartao`). A inscrição fica *Contato pendente* e o responsável é orientado a chamar a equipe no WhatsApp. Depois de receber, no painel: filtre **Contato pendente** → abra a inscrição → **✔ Recebido no crédito** (ou **no débito**). A inscrição passa para *Pago*.
+- **Cartão:** só no pacote de **2 semanas** (1 semana e diárias: somente PIX — regra no banco, coluna `turmas.aceita_cartao`). Na venda normal, a entrada de R$ 430 é paga no PIX com comprovante na própria inscrição (`precos.entrada_pix`). A inscrição fica *Contato pendente* até o cartão ser pago e o responsável é orientado a chamar a equipe no WhatsApp. Depois de receber, no painel: filtre **Contato pendente** → abra a inscrição → **✔ Recebido no crédito** (ou **no débito**). A inscrição passa para *Pago*.
 - Os comprovantes ficam no Supabase Storage (bucket privado `comprovantes`); só administradores conseguem abrir.
 
 ## Onde mudar cada coisa
-- **Turmas, valores, vagas por turma:** Supabase → Table Editor → `turmas` (`ativa = false` tira do formulário).
-- **Total de vagas, data de início, faixa de idade:** Supabase → Table Editor → `configuracao`.
+- **Lotes (datas de abertura/fechamento, título, limite de vagas):** Supabase → Table Editor → `lotes`.
+- **Preços por lote** (PIX, cartão, entrada): `precos`. **Diárias:** `precos_diaria` (faixas) e `dias_colonia` (dias).
+- **Turmas** (nome, aceita cartão, ativa): `turmas` (`ativa = false` tira do formulário).
+- **Data de início e faixa de idade:** `configuracao`.
 - **Nome, período, PIX, WhatsApp da equipe, contato de privacidade:** `config.js`.
 - **Estrutura do banco:** `schema.sql` (pode ser rodado de novo no SQL Editor sem apagar dados).
 

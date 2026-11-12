@@ -445,3 +445,376 @@ grant execute on function public.consultar_inscricao(bigint, text)   to anon, au
 grant execute on function public.informar_pagamento(bigint, text, numeric, text, text) to anon, authenticated;
 revoke execute on function public.anonimizar_inscricao(bigint) from public, anon;
 grant execute on function public.anonimizar_inscricao(bigint)        to authenticated;
+
+-- =====================================================================
+-- LOTES, DIÁRIAS E CARTÃO COM ENTRADA (11/11/2026)
+-- Pré-venda até 12/11 12h (30 vagas); venda normal a partir de 12/11 12h
+-- (sem limite). Diárias só na venda normal. Esta seção substitui as
+-- versões anteriores da visão e das funções definidas acima.
+-- =====================================================================
+create table if not exists public.lotes (
+  id       text primary key,
+  nome     text not null,            -- curto, para painéis: "Pré-venda"
+  titulo   text not null,            -- topo do site: "9ª Edição · Pré-venda"
+  abre_em  timestamptz,              -- null = já aberto
+  fecha_em timestamptz,              -- null = sem data para fechar
+  vagas    int check (vagas >= 0),   -- null = sem limite
+  ordem    int not null default 0
+);
+insert into public.lotes (id, nome, titulo, abre_em, fecha_em, vagas, ordem) values
+  ('pre-venda', 'Pré-venda',    '9ª Edição · Pré-venda',  null,                     '2026-11-12 12:00:00-03', 30,   1),
+  ('normal',    'Venda normal', '9ª Edição · Inscrições', '2026-11-12 12:00:00-03', null,                     null, 2)
+on conflict (id) do nothing;
+
+alter table public.turmas add column if not exists tipo text not null default 'pacote' check (tipo in ('pacote', 'diarias'));
+alter table public.turmas alter column vagas drop not null;   -- null = sem limite (limite da pré-venda fica no lote)
+insert into public.turmas (id, nome, valor, vagas, ordem, ativa, aceita_cartao, tipo)
+values ('diarias', 'Diárias', 0, null, 4, true, false, 'diarias')
+on conflict (id) do nothing;
+
+create table if not exists public.precos (
+  lote  text not null references public.lotes(id) on delete cascade,
+  turma text not null references public.turmas(id) on delete cascade,
+  valor numeric(10,2) not null check (valor >= 0),
+  primary key (lote, turma)
+);
+alter table public.precos
+  add column if not exists valor_cartao numeric(10,2) check (valor_cartao >= 0),  -- null = mesmo valor do PIX
+  add column if not exists entrada_pix  numeric(10,2) check (entrada_pix > 0);    -- null = sem entrada
+insert into public.precos (lote, turma, valor, valor_cartao, entrada_pix) values
+  ('pre-venda', 'semana1', 380, null, null), ('pre-venda', 'semana2', 380, null, null), ('pre-venda', '2semanas', 700, null, null),
+  ('normal',    'semana1', 430, null, null), ('normal',    'semana2', 430, null, null), ('normal',    '2semanas', 800, 860, 430),
+  ('normal',    'diarias',   0, null, null)   -- a linha habilita as diárias no lote; o valor vem de precos_diaria
+on conflict (lote, turma) do nothing;
+
+create table if not exists public.dias_colonia (data date primary key);
+insert into public.dias_colonia (data) values
+  ('2027-01-04'), ('2027-01-05'), ('2027-01-06'), ('2027-01-07'), ('2027-01-08'),
+  ('2027-01-11'), ('2027-01-12'), ('2027-01-13'), ('2027-01-14'), ('2027-01-15')
+on conflict do nothing;
+
+create table if not exists public.precos_diaria (
+  lote      text not null references public.lotes(id) on delete cascade,
+  min_dias  int  not null check (min_dias >= 1),   -- a partir de quantos dias vale este preço (para todos os dias)
+  valor_dia numeric(10,2) not null check (valor_dia > 0),
+  primary key (lote, min_dias)
+);
+insert into public.precos_diaria (lote, min_dias, valor_dia) values ('normal', 1, 100), ('normal', 3, 90)
+on conflict do nothing;
+
+alter table public.inscricoes add column if not exists lote text references public.lotes(id);
+update public.inscricoes set lote = 'pre-venda' where lote is null;
+alter table public.inscricoes alter column lote set not null;
+alter table public.inscricoes add column if not exists dias date[];  -- só para diárias
+create index if not exists inscricoes_lote_idx on public.inscricoes(lote);
+
+-- Segurança: lotes, preços e dias são públicos para leitura; só admin altera
+alter table public.lotes         enable row level security;
+alter table public.precos        enable row level security;
+alter table public.dias_colonia  enable row level security;
+alter table public.precos_diaria enable row level security;
+drop policy if exists "lotes: leitura publica" on public.lotes;
+create policy "lotes: leitura publica" on public.lotes for select to anon, authenticated using (true);
+drop policy if exists "lotes: admin" on public.lotes;
+create policy "lotes: admin" on public.lotes for all to authenticated using (public.eh_admin()) with check (public.eh_admin());
+drop policy if exists "precos: leitura publica" on public.precos;
+create policy "precos: leitura publica" on public.precos for select to anon, authenticated using (true);
+drop policy if exists "precos: admin" on public.precos;
+create policy "precos: admin" on public.precos for all to authenticated using (public.eh_admin()) with check (public.eh_admin());
+drop policy if exists "dias: leitura publica" on public.dias_colonia;
+create policy "dias: leitura publica" on public.dias_colonia for select to anon, authenticated using (true);
+drop policy if exists "dias: admin" on public.dias_colonia;
+create policy "dias: admin" on public.dias_colonia for all to authenticated using (public.eh_admin()) with check (public.eh_admin());
+drop policy if exists "precos_diaria: leitura publica" on public.precos_diaria;
+create policy "precos_diaria: leitura publica" on public.precos_diaria for select to anon, authenticated using (true);
+drop policy if exists "precos_diaria: admin" on public.precos_diaria;
+create policy "precos_diaria: admin" on public.precos_diaria for all to authenticated using (public.eh_admin()) with check (public.eh_admin());
+grant select on public.lotes, public.precos, public.dias_colonia, public.precos_diaria to anon;
+grant select, insert, update, delete on public.lotes, public.precos, public.dias_colonia, public.precos_diaria to authenticated;
+
+-- Visão do painel: lote + cartão com saldo em aberto = "Contato pendente" (mesmo com a entrada paga)
+drop view if exists public.inscricoes_detalhe;
+create view public.inscricoes_detalhe
+with (security_invoker = true) as
+select
+  i.*,
+  t.nome as turma_nome,
+  l.nome as lote_nome,
+  coalesce(p.pago, 0) as valor_pago,
+  greatest(i.valor - coalesce(p.pago, 0), 0) as saldo,
+  case
+    when i.cancelada                    then 'Cancelada'
+    when coalesce(p.pago, 0) >= i.valor then 'Pago'
+    when coalesce(p.pendentes, 0) > 0   then 'Aguardando confirmação'
+    when i.forma_pagamento = 'Cartão'   then 'Contato pendente'
+    when coalesce(p.pago, 0) > 0        then 'Parcial'
+    else 'Pendente'
+  end as status
+from public.inscricoes i
+join public.turmas t on t.id = i.turma
+join public.lotes  l on l.id = i.lote
+left join lateral (
+  select sum(valor) filter (where confirmado) as pago,
+         count(*)   filter (where not confirmado) as pendentes
+  from public.pagamentos
+  where inscricao_id = i.id
+) p on true;
+revoke all on public.inscricoes_detalhe from anon;
+grant select on public.inscricoes_detalhe to authenticated;
+
+-- Lote em vigor agora (o aberto mais recente); se nenhum estiver aberto, o próximo a abrir
+create or replace function public.lote_atual()
+returns text
+language sql stable security definer set search_path = public
+as $$
+  select coalesce(
+    (select id from public.lotes
+      where (abre_em is null or abre_em <= now()) and (fecha_em is null or now() < fecha_em)
+      order by ordem desc limit 1),
+    (select id from public.lotes where abre_em > now() order by abre_em limit 1),
+    (select id from public.lotes order by ordem desc limit 1));
+$$;
+
+-- Valor das diárias: todos os dias pelo preço da faixa (maior min_dias <= quantidade)
+create or replace function public.valor_diarias(p_lote text, p_dias int)
+returns numeric
+language sql stable security definer set search_path = public
+as $$
+  select p_dias * valor_dia from public.precos_diaria
+  where lote = p_lote and min_dias <= p_dias
+  order by min_dias desc limit 1;
+$$;
+
+-- Turmas do lote pedido (ou do lote atual), com preço, cartão, entrada, vagas e situação do lote
+drop function if exists public.turmas_disponiveis();
+drop function if exists public.turmas_disponiveis(text);
+create function public.turmas_disponiveis(p_lote text default null)
+returns table (
+  id text, nome text, valor numeric, restantes int, restantes_geral int,
+  data_inicio date, idade_min int, idade_max int, aceita_cartao boolean,
+  lote text, lote_nome text, lote_titulo text, lote_aberto boolean, abre_em timestamptz, fecha_em timestamptz,
+  tipo text, valor_cartao numeric, entrada_pix numeric
+)
+language sql stable security definer set search_path = public
+as $$
+  with l as (
+    select lt.*,
+           case when lt.vagas is null then null
+                else greatest(lt.vagas - (select count(*) from public.inscricoes i where i.lote = lt.id and not i.cancelada), 0) end as livre,
+           (lt.abre_em is null or lt.abre_em <= now()) and (lt.fecha_em is null or now() < lt.fecha_em) as aberto
+    from public.lotes lt
+    where lt.id = coalesce(nullif(p_lote, ''), public.lote_atual())
+  ),
+  c as (select data_inicio, idade_min, idade_max from public.configuracao where id = 1)
+  select t.id, t.nome, pr.valor,
+         case
+           when t.vagas is null and l.livre is null then null
+           else greatest(least(
+                  coalesce(t.vagas - (select count(*) from public.inscricoes i where i.turma = t.id and not i.cancelada), 2147483647),
+                  coalesce(l.livre, 2147483647)), 0)
+         end::int,
+         l.livre::int,
+         c.data_inicio, c.idade_min, c.idade_max, t.aceita_cartao,
+         l.id, l.nome, l.titulo, l.aberto, l.abre_em, l.fecha_em,
+         t.tipo, coalesce(pr.valor_cartao, pr.valor), pr.entrada_pix
+  from public.turmas t
+  join public.precos pr on pr.turma = t.id
+  join l on l.id = pr.lote
+  cross join c
+  where t.ativa
+  order by t.ordem, t.nome;
+$$;
+
+-- Cria a inscrição no lote informado (sem lote = pré-venda).
+-- PIX: valor total confirmado na hora. Cartão com entrada: entrada no PIX confirmada; o resto pelo WhatsApp.
+create or replace function public.criar_inscricao(dados jsonb)
+returns jsonb
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_turma    public.turmas%rowtype;
+  v_lote     public.lotes%rowtype;
+  v_preco    public.precos%rowtype;
+  v_cfg      public.configuracao%rowtype;
+  v_valor    numeric;
+  v_entrada  numeric;
+  v_dias     date[];
+  v_nasc     date;
+  v_idade    int;
+  v_tel      text := regexp_replace(coalesce(dados->>'responsavel_telefone', ''), '\D', '', 'g');
+  v_forma    text := dados->>'forma_pagamento';
+  v_comp     text := coalesce(dados->>'comprovante', '');
+  v_id       bigint;
+begin
+  if coalesce(trim(dados->>'aluno_nome'), '') = '' then
+    raise exception 'Preencha o campo: nome do aluno.';
+  end if;
+  if coalesce(dados->>'aluno_nascimento', '') !~ '^\d{4}-\d{2}-\d{2}$' then
+    raise exception 'Preencha o campo: data de nascimento.';
+  end if;
+  if coalesce(trim(dados->>'responsavel_nome'), '') = '' then
+    raise exception 'Preencha o campo: nome do responsável.';
+  end if;
+  if length(v_tel) not between 10 and 13 then
+    raise exception 'Telefone inválido (inclua o DDD).';
+  end if;
+  if v_forma is null or v_forma not in ('PIX', 'Cartão') then
+    raise exception 'Escolha a forma de pagamento.';
+  end if;
+  if coalesce((dados->>'consentimento')::boolean, false) is not true then
+    raise exception 'Para concluir, o responsável legal precisa aceitar o Aviso de Privacidade.';
+  end if;
+
+  -- trava o lote: serializa inscrições simultâneas para não estourar o limite de vagas
+  select * into v_lote from public.lotes where id = coalesce(nullif(dados->>'lote', ''), 'pre-venda') for update;
+  if not found then
+    raise exception 'Período de inscrição inválido.';
+  end if;
+  if v_lote.abre_em is not null and now() < v_lote.abre_em then
+    raise exception 'As inscrições (%) abrem em %.', v_lote.nome,
+      to_char(v_lote.abre_em at time zone 'America/Sao_Paulo', 'DD/MM "às" HH24"h"MI');
+  end if;
+  if v_lote.fecha_em is not null and now() >= v_lote.fecha_em then
+    raise exception 'A % foi encerrada. Atualize a página para ver as inscrições abertas.', lower(v_lote.nome);
+  end if;
+
+  select * into v_cfg from public.configuracao where id = 1;
+  v_nasc  := (dados->>'aluno_nascimento')::date;
+  v_idade := extract(year from age(v_cfg.data_inicio, v_nasc))::int;
+  if v_idade < v_cfg.idade_min or v_idade > v_cfg.idade_max then
+    raise exception 'A colônia é para crianças de % a % anos (idade em %).',
+      v_cfg.idade_min, v_cfg.idade_max, to_char(v_cfg.data_inicio, 'DD/MM/YYYY');
+  end if;
+
+  select * into v_turma from public.turmas where id = dados->>'turma' and ativa;
+  if not found then
+    raise exception 'Escolha uma turma válida.';
+  end if;
+  if v_forma = 'Cartão' and not v_turma.aceita_cartao then
+    raise exception 'Pagamento com cartão só para o pacote de 2 semanas. Para 1 semana ou diárias, pague via PIX.';
+  end if;
+  select * into v_preco from public.precos where lote = v_lote.id and turma = v_turma.id;
+  if not found then
+    raise exception 'Essa opção não está disponível neste período.';
+  end if;
+
+  -- Valor: diárias = dias escolhidos x preço da faixa; pacote = preço do lote (no cartão, preço do cartão)
+  if v_turma.tipo = 'diarias' then
+    select array_agg(distinct d order by d) into v_dias
+    from jsonb_array_elements_text(coalesce(dados->'dias', '[]'::jsonb)) as e(d_txt)
+    cross join lateral (select e.d_txt::date as d) x;
+    if v_dias is null or cardinality(v_dias) = 0 then
+      raise exception 'Escolha pelo menos um dia.';
+    end if;
+    if exists (select 1 from unnest(v_dias) d where d not in (select data from public.dias_colonia)) then
+      raise exception 'Algum dia escolhido não faz parte da colônia.';
+    end if;
+    v_valor := public.valor_diarias(v_lote.id, cardinality(v_dias));
+    if v_valor is null then
+      raise exception 'Diárias não disponíveis neste período.';
+    end if;
+  elsif v_forma = 'Cartão' then
+    v_valor   := coalesce(v_preco.valor_cartao, v_preco.valor);
+    v_entrada := v_preco.entrada_pix;
+  else
+    v_valor := v_preco.valor;
+  end if;
+
+  -- PIX (valor total) ou entrada no PIX do cartão: comprovante obrigatório
+  if (v_forma = 'PIX' or v_entrada is not null) and not public.comprovante_valido(v_comp) then
+    raise exception 'Anexe o comprovante do PIX.';
+  end if;
+
+  if v_lote.vagas is not null
+     and (select count(*) from public.inscricoes where lote = v_lote.id and not cancelada) >= v_lote.vagas then
+    raise exception 'As vagas da % esgotaram.', lower(v_lote.nome);
+  end if;
+  if v_turma.vagas is not null
+     and (select count(*) from public.inscricoes where turma = v_turma.id and not cancelada) >= v_turma.vagas then
+    raise exception 'Essa turma está lotada.';
+  end if;
+
+  insert into public.inscricoes (
+    aluno_nome, aluno_nascimento, aluno_escola, aluno_saude,
+    responsavel_nome, responsavel_cpf, responsavel_telefone, responsavel_email,
+    contato_emergencia, turma, valor, autoriza_imagem, consentimento_em, versao_aviso, forma_pagamento, lote, dias
+  ) values (
+    left(trim(dados->>'aluno_nome'), 150),
+    v_nasc,
+    nullif(left(trim(coalesce(dados->>'aluno_escola', '')), 150), ''),
+    nullif(left(trim(coalesce(dados->>'aluno_saude', '')), 1000), ''),
+    left(trim(dados->>'responsavel_nome'), 150),
+    nullif(left(regexp_replace(coalesce(dados->>'responsavel_cpf', ''), '\D', '', 'g'), 11), ''),
+    v_tel,
+    nullif(left(trim(coalesce(dados->>'responsavel_email', '')), 150), ''),
+    nullif(left(trim(coalesce(dados->>'contato_emergencia', '')), 200), ''),
+    v_turma.id,
+    v_valor,
+    coalesce((dados->>'autoriza_imagem')::boolean, false),
+    now(),
+    left(coalesce(dados->>'versao_aviso', ''), 20),
+    v_forma,
+    v_lote.id,
+    v_dias
+  ) returning id into v_id;
+
+  if v_forma = 'PIX' or v_entrada is not null then
+    insert into public.pagamentos (inscricao_id, valor, forma, data_pagamento, observacao, informado_por, confirmado, comprovante)
+    values (v_id, coalesce(v_entrada, v_valor), 'PIX', (now() at time zone 'America/Sao_Paulo')::date,
+            case when v_entrada is not null then 'Entrada no PIX' end, 'responsavel', true, v_comp);
+  end if;
+
+  return jsonb_build_object(
+    'id', v_id,
+    'aluno_nome', trim(dados->>'aluno_nome'),
+    'turma_nome', v_turma.nome,
+    'valor', v_valor,
+    'entrada_pix', v_entrada,
+    'dias', to_jsonb(v_dias),
+    'forma_pagamento', v_forma,
+    'lote', v_lote.id,
+    'responsavel_telefone', v_tel
+  );
+end;
+$$;
+
+-- Consulta do responsável (nº + telefone): inclui os dias das diárias
+create or replace function public.consultar_inscricao(p_id bigint, p_telefone text)
+returns jsonb
+language plpgsql stable security definer set search_path = public
+as $$
+declare
+  r public.inscricoes_detalhe%rowtype;
+begin
+  select * into r from public.inscricoes_detalhe
+  where id = p_id
+    and responsavel_telefone = regexp_replace(coalesce(p_telefone, ''), '\D', '', 'g');
+  if not found then
+    raise exception 'Inscrição não encontrada. Confira o número e o telefone.';
+  end if;
+
+  return jsonb_build_object(
+    'id', r.id,
+    'aluno_nome', r.aluno_nome,
+    'turma_nome', r.turma_nome,
+    'dias', to_jsonb(r.dias),
+    'valor', r.valor,
+    'valor_pago', r.valor_pago,
+    'saldo', r.saldo,
+    'status', r.status,
+    'forma_pagamento', r.forma_pagamento,
+    'responsavel_telefone', r.responsavel_telefone,
+    'pagamentos', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'data_pagamento', p.data_pagamento, 'valor', p.valor, 'forma', p.forma,
+               'confirmado', p.confirmado, 'com_comprovante', p.comprovante is not null) order by p.id)
+      from public.pagamentos p where p.inscricao_id = r.id), '[]'::jsonb)
+  );
+end;
+$$;
+
+grant execute on function public.lote_atual()                      to anon, authenticated;
+grant execute on function public.valor_diarias(text, int)          to anon, authenticated;
+grant execute on function public.turmas_disponiveis(text)          to anon, authenticated;
+grant execute on function public.criar_inscricao(jsonb)            to anon, authenticated;
+grant execute on function public.consultar_inscricao(bigint, text) to anon, authenticated;
